@@ -85,23 +85,14 @@ class PredictService:
         )
 
         # # tạo BytesIO
-        # bio = BytesIO(trace_bytes)
         # 1) Ghi ra file vật lý tạm thời
         with open("trace_model.nc", "wb") as f:
             f.write(trace_bytes)
-        # # Mở NetCDF với engine 'h5netcdf'
-        # trace_model = xr.open_dataset(bio, engine="h5netcdf", decode_times=True)
-        # trace_model = az.from_netcdf(bio)
         # 2) Load lại bằng ArviZ
         trace_model = az.from_netcdf("trace_model.nc")
-        # trace_model = trace_model.load()
-        # trace_model = load_trace_from_bytes(trace_bytes)
 
         mappings_model = joblib.load(BytesIO(mappings_bytes))
 
-        # food_distributions = forecast_dishes(
-        #     trace_model, mappings_model, 10, store_id, timeslot_id
-        # )
         result_food = []
         if store_id == 4:
             for row in result_customers:
@@ -131,6 +122,8 @@ class PredictService:
                             "hdi95_high": info["hdi95"][1],
                         }
                     )
+                    
+        
 
         return result_customers, result_food
 
@@ -482,3 +475,7 @@ def load_trace_from_bytes(trace_bytes: bytes):
     os.remove(tmp.name)
 
     return trace_model
+
+
+# def forecast_ingredient():
+    
