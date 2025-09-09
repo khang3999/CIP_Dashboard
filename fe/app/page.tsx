@@ -48,7 +48,9 @@ function PredictionsSection() {
   // const [predictionParams, setPredictionParams] = useState<PredictionParams | null>(null)
   const { predictionParams, setPredictionParams, selectedTimeslot } = usePredictionProvider()
   const [isLoading, setIsLoading] = useState(false)
-  const [resultPredict, setResultPredict] = useState<any[] | null>([])
+  const [resultCustomers, setResultCustomers] = useState<any[] | null>([])
+  const [resultFoods, setResultFoods] = useState<any[] | null>([])
+  const [resultIngredients, setResultIngredients] = useState<any[] | null>([])
 
   const handlePredict = async (predictionParams: PredictionParams | null) => {
 
@@ -89,13 +91,13 @@ function PredictionsSection() {
     const { data } = await res.json()
     console.log(startDate);
     console.log(data);
-    setResultPredict(data)
+    setResultCustomers(data.result_customers)
     setIsLoading(false)
   }
 
   useEffect(() => {
     if (!predictionParams) return
-    setResultPredict(null)
+    setResultCustomers(null)
   }, [predictionParams])
 
   return (
@@ -106,7 +108,7 @@ function PredictionsSection() {
           <PredictionControls onPredict={handlePredict} isLoading={isLoading} />
         </div>
         <div className="lg:col-span-2">
-          {resultPredict ? (
+          {resultCustomers ? (
             <Card>
               <CardHeader>
                 <CardTitle>Số lượng khách</CardTitle>
@@ -131,12 +133,12 @@ function PredictionsSection() {
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="passengers" fill="#059669" />
             </BarChart> */}
-                    {resultPredict?.length != 0 ?
-                      <LineChart data={resultPredict!} margin={{ top: 15, bottom: 15 }}>
+                    {resultCustomers?.length != 0 ?
+                      <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultPredict, predictionParams) })}
+                          {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultCustomers, predictionParams) })}
                           // ticks={generateTicks(loungeUsageData, params)}
                           padding={{ left: 30, right: 30 }}
                           // interval={0}

@@ -76,7 +76,8 @@ class PredictService:
         ##### ====== ####
         ### Dự đoán phân bổ món ăn
         # Load config, và trace
-        trace_path = f"trace_model_{'qn' if region_id == 2 else 'qt'}.nc"
+        # trace_path = f"trace_model_{'qn' if region_id == 2 else 'qt'}.nc"
+        trace_path = "trace_model_qn.nc"
         trace_bytes = self.supabase.storage.from_(BUCKET_NAME).download(trace_path)
         # Load config
         mappings_bytes = self.supabase.storage.from_(BUCKET_NAME).download(
@@ -85,46 +86,51 @@ class PredictService:
 
         # # tạo BytesIO
         # bio = BytesIO(trace_bytes)
-
+        # 1) Ghi ra file vật lý tạm thời
+        with open("trace_model.nc", "wb") as f:
+            f.write(trace_bytes)
         # # Mở NetCDF với engine 'h5netcdf'
         # trace_model = xr.open_dataset(bio, engine="h5netcdf", decode_times=True)
-
+        # trace_model = az.from_netcdf(bio)
+        # 2) Load lại bằng ArviZ
+        trace_model = az.from_netcdf("trace_model.nc")
         # trace_model = trace_model.load()
-        trace_model = load_trace_from_bytes(trace_bytes)
+        # trace_model = load_trace_from_bytes(trace_bytes)
 
         mappings_model = joblib.load(BytesIO(mappings_bytes))
 
-        food_distributions = forecast_dishes(
-            trace_model, mappings_model, 10, store_id, timeslot_id
-        )
+        # food_distributions = forecast_dishes(
+        #     trace_model, mappings_model, 10, store_id, timeslot_id
+        # )
         result_food = []
-
-        for row in result_customers:
-            allocation = forecast_dishes(
-                trace=trace_model,
-                mappings=mappings_model,
-                pax=row["total_customers"],
-                store_id=store_id,
-                timeslot=timeslot_id,
-            )
-
-            # Lưu kết quả theo từng món
-
-            for item_id, info in allocation.items():
-                result_food.append(
-                    {
-                        "date": row["date"],
-                        "store_id": row["store_name"],
-                        "timeslot": row["timeslot"],
-                        "item_id": item_id,
-                        "forecast": info["forecast"],
-                        "mu": info["mu"],
-                        "hdi80_low": info["hdi80"][0],
-                        "hdi80_high": info["hdi80"][1],
-                        "hdi95_low": info["hdi95"][0],
-                        "hdi95_high": info["hdi95"][1],
-                    }
+        if store_id == 4:
+            for row in result_customers:
+                allocation = forecast_dishes(
+                    trace=trace_model,
+                    mappings=mappings_model,
+                    pax=row["total_customers"],
+                    store_id=store_id,
+                    timeslot_id=timeslot_id,
                 )
+
+                # Lưu kết quả theo từng món
+
+                for item_id, info in allocation.items():
+                    result_food.append(
+                        {
+                            "date": row["date"],
+                            "store_id": row["store_name"],
+                            "timeslot": row["timeslot"],
+                            "pax":row["total_customers"],
+                            "item_id": item_id,
+                            "forecast": info["forecast"],
+                            "mu": info["mu"],
+                            "hdi80_low": info["hdi80"][0],
+                            "hdi80_high": info["hdi80"][1],
+                            "hdi95_low": info["hdi95"][0],
+                            "hdi95_high": info["hdi95"][1],
+                        }
+                    )
 
         return result_customers, result_food
 
@@ -431,13 +437,30 @@ def forecast_dishes(trace, mappings, pax, store_id, timeslot_id, hdi_probs=[0.8,
 
     # Build result
     result = {}
+    print(item_codes, "item_codes")
     for i, item_id in enumerate(selected_items):
         idx = item_codes[item_id]
         item_info = {"forecast": int(allocation[i]), "mu": float(mu_item_mean[idx])}
         # Add HDI
         for p, hdi in hdi_results.items():
-            low = float(hdi.isel(mu_item_dim_0=idx).isel(hdi=0).item())
-            high = float(hdi.isel(mu_item_dim_0=idx).isel(hdi=1).item())
+            # dim_item = hdi.dims[0]
+            # low = float(hdi.isel(dim_item=idx).isel(hdi=0).item())
+            # high = float(hdi.isel(dim_item=idx).isel(hdi=1).item())
+            # item_info[f"hdi{int(p * 100)}"] = (low, high)
+
+            # chuyển sang numpy array
+            if isinstance(hdi, xr.Dataset):
+                # Giả sử biến là 'mu_item' trong Dataset
+                hdi_da = hdi["mu_item"]
+            else:
+                hdi_da = hdi
+
+            hdi_np = hdi_da.values  # shape = (n_items, 2)
+            print(type(hdi_da), "ck")  # phải là xarray.DataArray
+            print(type(hdi_da.values), "ck")  # phải là numpy.ndarray
+            print(hdi_da.shape, "ck")  # kiểm tra shape
+            low = float(hdi_np[idx, 0])
+            high = float(hdi_np[idx, 1])
             item_info[f"hdi{int(p * 100)}"] = (low, high)
 
         result[item_id] = item_info
