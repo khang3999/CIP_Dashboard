@@ -159,51 +159,53 @@ export function PredictionControls({ onPredict, isLoading }: PredictionControlsP
         <CardDescription>Chọn thời gian và khu vực để dự đoán</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="region" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Khu vực <span className="text-red-500">*</span>
-          </Label>
-          <Select value={predictionParams?.region_id?.toString()} onValueChange={handleRegionChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Chọn khu vực" />
-            </SelectTrigger>
-            <SelectContent>
-              {regions.map((region) => (
-                <SelectItem key={region.id} value={region.id.toString()}>
-                  {region.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* {selectedRegion && ( */}
-        <div className="space-y-2">
-          <Label htmlFor="store" className="flex items-center gap-2">
-            <StoreComponentLayout className="h-4 w-4" />
-            Phòng chờ <span className="text-red-500">*</span>
-          </Label>
-          <Select value={selectedStore?.id.toString() || ""} onValueChange={handleStoreChange} disabled={!selectedRegion}>
-            <SelectTrigger>
-              <SelectValue placeholder="Vui lòng chọn phòng chờ" />
-            </SelectTrigger>
-            <SelectContent>
-              {/* <SelectItem value="all">
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="region" className="text-sm font-semibold">
+              <MapPin className="h-4 w-4" />
+              Khu vực <span className="text-red-500">*</span>
+            </Label>
+            <Select value={predictionParams?.region_id?.toString()} onValueChange={handleRegionChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn khu vực" />
+              </SelectTrigger>
+              <SelectContent>
+                {regions.map((region) => (
+                  <SelectItem key={region.id} value={region.id.toString()}>
+                    {region.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="store" className="text-sm font-semibold">
+              <StoreComponentLayout className="h-4 w-4" />
+              Phòng chờ <span className="text-red-500">*</span>
+            </Label>
+            <Select value={selectedStore?.id.toString() || ""} onValueChange={handleStoreChange} disabled={!selectedRegion}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vui lòng chọn phòng chờ" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* <SelectItem value="all">
                   Toàn khu vực {regions.find((r) => r.id === params.region_id)?.name}
                 </SelectItem> */}
-              {availableStores.map((store) => (
-                <SelectItem key={store.id} value={store.id.toString()}>
-                  {store.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                {availableStores.map((store) => (
+                  <SelectItem key={store.id} value={store.id.toString()}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        {/* )} */}
+
 
         <div className="space-y-4">
-          <Label>Loại thời gian</Label>
+          <Label className="text-sm font-semibold">
+            <Calendar className="h-4 w-4" />
+            Chọn thời gian <span className="text-red-500">*</span></Label>
           <div className="flex gap-4">
             <Button
               variant={predictionParams?.timeType === "preset" ? "default" : "outline"}
@@ -224,12 +226,12 @@ export function PredictionControls({ onPredict, isLoading }: PredictionControlsP
 
         {predictionParams?.timeType === "preset" && (
           <div className="space-y-2">
-            <Label htmlFor="presetRange" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Khoảng thời gian <span className="text-red-500">*</span>
+            <Label htmlFor="presetRange" className="flex-1 items-center gap-2">
+              Khoảng thời gian
             </Label>
             <Select value={predictionParams.presetRange?.id.toString()} onValueChange={handlePresetRangeChange}>
               <SelectTrigger>
+                <CalendarDays className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Chọn khoảng thời gian" />
               </SelectTrigger>
               <SelectContent>
@@ -246,18 +248,18 @@ export function PredictionControls({ onPredict, isLoading }: PredictionControlsP
         {predictionParams?.timeType === "custom" && (
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
+              {/* <CalendarDays className="h-4 w-4" /> */}
               {/* Từ: Ngày mai - Đến: {params.dateRange?.to ? format(params.dateRange?.to, "P", { locale: vi }) : <span>   </span>} */}
-              Khoảng thời gian <span className="text-red-500">*</span>
+              Khoảng thời gian
             </Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal bg-transparent">
+                <Button variant="outline" className="w-auto justify-start text-left font-normal bg-transparent">
                   <CalendarDays className="mr-2 h-4 w-4" />
                   {predictionParams.dateRange?.to ? `Ngày mai - ` + format(predictionParams.dateRange?.to, "P", { locale: vi }) : <span>Chọn ngày</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent>
                 <CalendarComponent
                   mode="range"
                   required
@@ -278,10 +280,10 @@ export function PredictionControls({ onPredict, isLoading }: PredictionControlsP
         )}
 
         <div className="space-y-2">
-          <label className="flex items-center gap-2">
+          <Label className="text-sm font-semibold">
             <Clock className="h-4 w-4" />
             Ca làm việc <span className="text-red-500">*</span>
-          </label>
+          </Label>
           <Select value={selectedTimeslot?.id.toString() || ""} onValueChange={handleTimeslotChange} disabled={!selectedStore || (!predictionParams?.presetRange && !predictionParams?.dateRange)}>
             <SelectTrigger>
               <SelectValue placeholder="Chọn ca làm việc" />
@@ -298,7 +300,7 @@ export function PredictionControls({ onPredict, isLoading }: PredictionControlsP
         </div>
 
         <div className="space-y-2">
-          <Label>Tham số hiện tại:</Label>
+          <Label className="text-sm font-semibold">Đã chọn:</Label>
           <div className="flex flex-wrap gap-2">
             {predictionParams?.region_id && (
               <Badge variant="outline">

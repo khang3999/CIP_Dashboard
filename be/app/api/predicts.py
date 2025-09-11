@@ -36,7 +36,7 @@ async def create_predict(body: dict = Body(...)):
     ):
         raise HTTPException(status_code=400, detail="Missing required fields")
     print(region_id, store_id, timeslot_id, start_date, end_date)
-    result_customers, result_food = predict_service.predict(
+    result_customers, result_foods, result_ingredients = predict_service.predict(
         start_date=start_date,
         end_date=end_date,
         region_id=region_id,
@@ -45,7 +45,11 @@ async def create_predict(body: dict = Body(...)):
     )
     return {
         "status": "Success",
-        "data": {"result_customers": result_customers, "result_food": result_food},
+        "data": {
+            "result_customers": result_customers,
+            "result_foods": result_foods,
+            "result_ingredients": result_ingredients,
+        },
     }
 
 

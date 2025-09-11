@@ -21,6 +21,7 @@ import { formatDate, generateTicks, getDateRangeOfFuture } from "@/utils/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import DailyChart from "@/components/daily-chart"
 
 
 function OverviewSection() {
@@ -48,17 +49,15 @@ function PredictionsSection() {
   // const [predictionParams, setPredictionParams] = useState<PredictionParams | null>(null)
   const { predictionParams, setPredictionParams, selectedTimeslot } = usePredictionProvider()
   const [isLoading, setIsLoading] = useState(false)
-  const [resultCustomers, setResultCustomers] = useState<any[] | null>([])
-  const [resultFoods, setResultFoods] = useState<any[] | null>([])
-  const [resultIngredients, setResultIngredients] = useState<any[] | null>([])
+  const [resultCustomers, setResultCustomers] = useState<any[] | null>(null)
+  const [resultFoods, setResultFoods] = useState<any[] | null>(null)
+  const [resultIngredients, setResultIngredients] = useState<any[] | null>(null)
 
   const handlePredict = async (predictionParams: PredictionParams | null) => {
-
     if (!predictionParams) {
       console.log("Params is null");
       return
     }
-    console.log("here");
     // setIsLoading(true)
     // await new Promise((resolve) => setTimeout(resolve, 2000))
     setPredictionParams(predictionParams)
@@ -92,102 +91,121 @@ function PredictionsSection() {
     console.log(startDate);
     console.log(data);
     setResultCustomers(data.result_customers)
+    setResultFoods(data.result_foods)
+    setResultIngredients(data.result_ingredients)
     setIsLoading(false)
   }
 
   useEffect(() => {
     if (!predictionParams) return
     setResultCustomers(null)
+    setResultFoods(null)
+    setResultIngredients(null)
   }, [predictionParams])
+
+  useEffect(() => {
+    if (!resultFoods) return
+    // Xử lí gom nhóm món ăn theo ngày
+  }, [resultFoods])
 
   return (
     // <PredictionProvider>
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
+        <div className="col-span-1 lg:col-span-3">
           <PredictionControls onPredict={handlePredict} isLoading={isLoading} />
         </div>
-        <div className="lg:col-span-2">
+        <div className="col-span-3 lg:col-span-3" >
           {resultCustomers ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Số lượng khách</CardTitle>
-                <CardDescription>Dự đoán lượng khách sử dụng phòng chờ {selectedTimeslot?.timeslot}</CardDescription>
-              </CardHeader>
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Số lượng khách</CardTitle>
+                  <CardDescription>Dự đoán lượng khách sử dụng phòng chờ {selectedTimeslot?.timeslot}</CardDescription>
+                </CardHeader>
 
-              <CardContent className="flex justify-center">
-                <ChartContainer
-                  config={{
-                    total_customers: {
-                      label: "Số khách",
-                      color: "hsl(var(--chart-1))",
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      total_customers: {
+                        label: "Số khách",
+                        color: "hsl(var(--chart-1))",
 
-                    },
-                  }}
-                  className="w-[80%] px-5 z-10"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    {/* <BarChart data={availableTimeslot}>
-              <XAxis dataKey="shift" />
-              <YAxis />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="passengers" fill="#059669" />
-            </BarChart> */}
-                    {resultCustomers?.length != 0 ?
-                      <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultCustomers, predictionParams) })}
-                          // ticks={generateTicks(loungeUsageData, params)}
-                          padding={{ left: 30, right: 30 }}
-                          // interval={0}
-                          tickFormatter={(str) => {
-                            const d = new Date(str);
-                            return predictionParams?.presetRange?.time_status === 'today'
-                              ? `${d.getMonth() + 1}/${d.getFullYear()}`  // hiển thị tháng
-                              : `${d.getDate()}/${d.getMonth() + 1}`;     // hiển thị ngày
-                            // if (params?.presetRange?.time_status === 'today') {
-                            //   return `${d.getMonth() + 1}`;
-                            // }
-                            // return `${d.getDate()}/${d.getMonth() + 1}`;
-                          }}
-                        >
-                          <Label value={predictionParams?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
-                        </XAxis>
-                        <YAxis>
-                          <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
-                        </YAxis>
-                        {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
-                      </LineChart>
-                      :
-                      <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>
+                      },
+                    }}
+                    className="w-[100%] px-5 z-10"
+                  >
+                    {/* <div className='h-full'> */}
+                      <ResponsiveContainer width="100%" height="100%" className={"select-none"}>
+                        {resultCustomers?.length != 0 ?
+                          <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultCustomers, predictionParams) })}
+                              // ticks={generateTicks(loungeUsageData, params)}
+                              padding={{ left: 30, right: 30 }}
+                              // interval={0}
+                              tickFormatter={(str) => {
+                                const d = new Date(str);
+                                return predictionParams?.presetRange?.time_status === 'today'
+                                  ? `${d.getMonth() + 1}/${d.getFullYear()}`  // hiển thị tháng
+                                  : `${d.getDate()}/${d.getMonth() + 1}`;     // hiển thị ngày
+                                // if (params?.presetRange?.time_status === 'today') {
+                                //   return `${d.getMonth() + 1}`;
+                                // }
+                                // return `${d.getDate()}/${d.getMonth() + 1}`;
+                              }}
+                            >
+                              <Label value={predictionParams?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
+                            </XAxis>
+                            <YAxis
+                              tick={{ style: { userSelect: "none", cursor: "default" } }}
+                            >
+                              <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
+                            </YAxis>
+                            {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
+                          </LineChart>
+                          :
+                          <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>
 
-                    }
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                        }
+                      </ResponsiveContainer>
+                    {/* </div> */}
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </>
           ) : (
-            <div className="bg-card p-6 rounded-lg border border-border text-center">
-              <p className="text-muted-foreground">Chọn tham số và nhấn "Tạo dự đoán" để xem kết quả</p>
-            </div>
+            <>
+              <Card className="grid grid-cols-1 gap-6">
+                <p className="text-muted-foreground text-center">Chọn tham số và nhấn "Tạo dự đoán" để xem kết quả</p>
+              </Card>
+            </>
           )}
         </div>
       </div>
+      {resultFoods && resultIngredients ?
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          {/*  Chart tích hợp */}
+          {/* <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} /> */}
+          {/* MÓN ĂN */}
+          {/* <Card> */}
+          {/* <CardHeader>
+              <CardTitle>Số lượng món và nguyên liệu</CardTitle>
+              <CardDescription>Dự đoán món ăn, nguyên liệu, thời điểm đặt hàng {selectedTimeslot?.timeslot}</CardDescription>
+            </CardHeader> */}
+          {/* <CardContent className="flex justify-center"> */}
+          <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} />
+          {/* </CardContent> */}
+          {/* </Card> */}
 
-      {predictionParams && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* <PassengerShiftChart params={predictionParams} selectedTimeslot={selectedTimeslot || undefined} /> */}
-
-          <FoodDistributionChart />
-          <IngredientDistributionChart />
-        </div>
-      )}
+        </div> :
+        <></>
+      }
     </div>
-    // </PredictionProvider>
   )
 }
 

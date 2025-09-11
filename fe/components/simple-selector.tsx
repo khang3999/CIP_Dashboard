@@ -68,8 +68,8 @@ export function SimpleSelector() {
   }
   const handlePresetRangeChange = (presetId: string) => {
     const preset = presetRanges.find((p) => p.id === Number.parseInt(presetId))
-    console.log(preset,'choose');
-    
+    console.log(preset, 'choose');
+
     setSelectedPresetRange(preset || null)
     setSelectedTimeslot(null) // Reset timeslot
     setParams({ ...params, presetRange: preset })
@@ -120,7 +120,9 @@ export function SimpleSelector() {
         <div className="space-y-2 flex gap-10">
           <div className="space-y-4 flex-3">
             <div className="space-y-4">
-              <Label>Loại thời gian</Label>
+              <Label className="text-sm font-semibold">
+                <Calendar className="h-4 w-4" />
+                Chọn thời gian <span className="text-red-500">*</span></Label>
               <div className="flex gap-4">
                 <Button
                   variant={params?.timeType === "preset" ? "default" : "outline"}
@@ -142,11 +144,11 @@ export function SimpleSelector() {
             {params?.timeType === "preset" && (
               <div className="space-y-2">
                 <Label htmlFor="presetRange" className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
                   Khoảng thời gian
                 </Label>
                 <Select value={params.presetRange?.id.toString()} onValueChange={handlePresetRangeChange}>
                   <SelectTrigger>
+                    <CalendarDays className="mr-2 h-4 w-4" />
                     <SelectValue placeholder="Chọn khoảng thời gian" />
                   </SelectTrigger>
                   <SelectContent>
@@ -163,7 +165,7 @@ export function SimpleSelector() {
             {params?.timeType === "custom" && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4" />
+                  {/* <CalendarDays className="h-4 w-4" /> */}
                   {/* Từ: {params.dateRange?.from ? format(params.dateRange.from, "P") : <span>...</span>}
                   Đến: {params.dateRange?.to ? format(params.dateRange.to, "P") : <span>...</span>} */}
                   Khoảng thời gian
@@ -192,7 +194,9 @@ export function SimpleSelector() {
           <div className="flex-1"></div>
           <div className="space-y-4 flex-2">
             <div className="space-y-2" >
-              <label className="text-sm font-semibold">Khu vực <span className="text-red-500">*</span></label>
+              <Label className="text-sm font-semibold">
+                <MapPin className="h-4 w-4" />
+                Khu vực <span className="text-red-500">*</span></Label>
               <Select value={selectedRegion?.id.toString() || ""} onValueChange={handleRegionChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn khu vực" />
@@ -208,7 +212,9 @@ export function SimpleSelector() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Phòng chờ <span className="text-red-500">*</span></label>
+              <Label className="text-sm font-semibold">
+                <StoreComponentLayout className="h-4 w-4" />
+                Phòng chờ <span className="text-red-500">*</span></Label>
               <Select value={selectedStore?.id.toString() || ""} onValueChange={handleStoreChange} disabled={!selectedRegion}>
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn phòng chờ" />
@@ -224,7 +230,9 @@ export function SimpleSelector() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Ca làm việc <span className="text-red-500">*</span></label>
+              <Label className="text-sm font-semibold">
+                <Clock className="h-4 w-4" />
+                Ca làm việc <span className="text-red-500">*</span></Label>
               <Select value={selectedTimeslot?.id.toString() || ""} onValueChange={handleTimeslotChange} disabled={!selectedStore || (!params?.presetRange && !params?.dateRange)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn ca làm việc" />
@@ -272,7 +280,7 @@ export function SimpleSelector() {
             )}
             {params?.timeslot_id && (
               <Badge variant="outline">
-                <Clock className="h-3 w-3 mr-1" />
+                <Clock className="h-4 w-4" />
                 {timeslots.find((s) => s.id === params.timeslot_id)?.timeslot}
               </Badge>
             )}
