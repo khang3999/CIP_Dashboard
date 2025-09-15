@@ -9,13 +9,19 @@ import { Upload, FileSpreadsheet, X, Download } from "lucide-react"
 import { useDropzone } from "react-dropzone"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import CardUpload from "./ui/card-upload"
 
-
+export enum FileType {
+  Customers = "customers",
+  Weather = "weather",
+  Flights = "flights",
+  Refill = "refill",
+}
 interface UploadedFile {
   id: string
   name: string
   size: number
-  type: string
+  type: FileType
   uploadDate: string
   status: "uploading" | "completed" | "error" | "processing"
   progress: number
@@ -23,143 +29,168 @@ interface UploadedFile {
   columns?: number
 }
 
+const files = [
+  {
+    type: FileType.Customers,
+    title: "Hành khách sử dụng phòng chờ",
+    // description: "Dữ liệu hành khách sử dụng phòng chờ",
+    // label: "",
+    // inputId: string,
+    accept: ".xlsx,.xls",
+    // required?: boolean,
+    // onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void,
+    // onSave?: () => void,
+  },
+  {
+    type: FileType.Flights,
+    title: "Chuyến bay",
+    accept: ".xlsx,.xls",
+  },
+  {
+    type: FileType.Refill,
+    title: "Nhật ký bổ sung món ăn",
+    accept: ".xlsx,.xls",
+  }
+]
+
 export function FileUpload() {
   const [customerFile, setCustomerFile] = useState<File | null>(null)
   const [flightFile, setFlightFile] = useState<File | null>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
-    {
-      id: "static-1",
-      name: "sales_data_2024.xlsx",
-      size: 2048576,
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      uploadDate: "2024-01-15", // Static date string instead of new Date()
-      status: "completed",
-      progress: 100,
-      rows: 50000,
-      columns: 12,
-    },
-    {
-      id: "static-2",
-      name: "customer_data.xlsx",
-      size: 1536000,
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      uploadDate: "2024-01-20", // Static date string
-      status: "completed",
-      progress: 100,
-      rows: 25000,
-      columns: 8,
-    },
-  ])
+  const [logRefillFile, setLogRefillFile] = useState<File | null>(null)
+  // const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
+  //   {
+  //     id: "static-1",
+  //     name: "sales_data_2024.xlsx",
+  //     size: 2048576,
+  //     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  //     uploadDate: "2024-01-15", // Static date string instead of new Date()
+  //     status: "completed",
+  //     progress: 100,
+  //     rows: 50000,
+  //     columns: 12,
+  //   },
+  //   {
+  //     id: "static-2",
+  //     name: "customer_data.xlsx",
+  //     size: 1536000,
+  //     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  //     uploadDate: "2024-01-20", // Static date string
+  //     status: "completed",
+  //     progress: 100,
+  //     rows: 25000,
+  //     columns: 8,
+  //   },
+  // ])
 
 
-  const [idCounter, setIdCounter] = useState(3)
+  // const [idCounter, setIdCounter] = useState(3)
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      acceptedFiles.forEach((file) => {
-        const newFile: UploadedFile = {
-          id: `file-${idCounter}`, // Use counter instead of Date.now()
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          uploadDate: "2024-01-28", // Static date string instead of new Date()
-          status: "uploading",
-          progress: 0,
-        }
+  // const onDrop = useCallback(
+  //   (acceptedFiles: File[]) => {
+  //     acceptedFiles.forEach((file) => {
+  //       const newFile: UploadedFile = {
+  //         id: `file-${idCounter}`, // Use counter instead of Date.now()
+  //         name: file.name,
+  //         size: file.size,
+  //         type: file.type,
+  //         uploadDate: "2024-01-28", // Static date string instead of new Date()
+  //         status: "uploading",
+  //         progress: 0,
+  //       }
 
-        setIdCounter((prev) => prev + 1)
-        setUploadedFiles((prev) => [...prev, newFile])
+  //       setIdCounter((prev) => prev + 1)
+  //       setUploadedFiles((prev) => [...prev, newFile])
 
-        const interval = setInterval(() => {
-          setUploadedFiles((prev) =>
-            prev.map((f) => {
-              if (f.id === newFile.id && f.progress < 100) {
-                const progressIncrement = 15 + ((f.id.length * 3) % 10) // Deterministic increment
-                const newProgress = Math.min(f.progress + progressIncrement, 100)
-                return {
-                  ...f,
-                  progress: newProgress,
-                  status: newProgress === 100 ? "processing" : "uploading",
-                }
-              }
-              return f
-            }),
-          )
-        }, 500)
+  //       const interval = setInterval(() => {
+  //         setUploadedFiles((prev) =>
+  //           prev.map((f) => {
+  //             if (f.id === newFile.id && f.progress < 100) {
+  //               const progressIncrement = 15 + ((f.id.length * 3) % 10) // Deterministic increment
+  //               const newProgress = Math.min(f.progress + progressIncrement, 100)
+  //               return {
+  //                 ...f,
+  //                 progress: newProgress,
+  //                 status: newProgress === 100 ? "processing" : "uploading",
+  //               }
+  //             }
+  //             return f
+  //           }),
+  //         )
+  //       }, 500)
 
-        // Simulate processing completion
-        setTimeout(() => {
-          clearInterval(interval)
-          setUploadedFiles((prev) =>
-            prev.map((f) =>
-              f.id === newFile.id
-                ? {
-                  ...f,
-                  status: "completed",
-                  progress: 100,
-                  rows: 25000 + ((f.id.length * 1000) % 25000), // Deterministic values
-                  columns: 8 + (f.id.length % 5), // Deterministic values
-                }
-                : f,
-            ),
-          )
-        }, 3000)
-      })
-    },
-    [idCounter],
-  )
+  //       // Simulate processing completion
+  //       setTimeout(() => {
+  //         clearInterval(interval)
+  //         setUploadedFiles((prev) =>
+  //           prev.map((f) =>
+  //             f.id === newFile.id
+  //               ? {
+  //                 ...f,
+  //                 status: "completed",
+  //                 progress: 100,
+  //                 rows: 25000 + ((f.id.length * 1000) % 25000), // Deterministic values
+  //                 columns: 8 + (f.id.length % 5), // Deterministic values
+  //               }
+  //               : f,
+  //           ),
+  //         )
+  //       }, 3000)
+  //     })
+  //   },
+  //   [idCounter],
+  // )
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-      "application/vnd.ms-excel": [".xls"],
-      "text/csv": [".csv"],
-    },
-    maxSize: 10 * 1024 * 1024, // 10MB
-  })
+  // const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  //   onDrop,
+  //   accept: {
+  //     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+  //     "application/vnd.ms-excel": [".xls"],
+  //     "text/csv": [".csv"],
+  //   },
+  //   maxSize: 10 * 1024 * 1024, // 10MB
+  // })
 
-  const removeFile = (id: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.id !== id))
-  }
+  // const removeFile = (id: string) => {
+  //   setUploadedFiles((prev) => prev.filter((f) => f.id !== id))
+  // }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+  // const formatFileSize = (bytes: number) => {
+  //   if (bytes === 0) return "0 Bytes"
+  //   const k = 1024
+  //   const sizes = ["Bytes", "KB", "MB", "GB"]
+  //   const i = Math.floor(Math.log(bytes) / Math.log(k))
+  //   return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  // }
 
-  const getStatusColor = (status: UploadedFile["status"]) => {
-    switch (status) {
-      case "completed":
-        return "bg-primary text-primary-foreground"
-      case "uploading":
-        return "bg-blue-500 text-white"
-      case "processing":
-        return "bg-yellow-500 text-white"
-      case "error":
-        return "bg-destructive text-destructive-foreground"
-      default:
-        return "bg-muted text-muted-foreground"
-    }
-  }
+  // const getStatusColor = (status: UploadedFile["status"]) => {
+  //   switch (status) {
+  //     case "completed":
+  //       return "bg-primary text-primary-foreground"
+  //     case "uploading":
+  //       return "bg-blue-500 text-white"
+  //     case "processing":
+  //       return "bg-yellow-500 text-white"
+  //     case "error":
+  //       return "bg-destructive text-destructive-foreground"
+  //     default:
+  //       return "bg-muted text-muted-foreground"
+  //   }
+  // }
 
-  const getStatusText = (status: UploadedFile["status"]) => {
-    switch (status) {
-      case "completed":
-        return "Hoàn thành"
-      case "uploading":
-        return "Đang tải lên"
-      case "processing":
-        return "Đang xử lý"
-      case "error":
-        return "Lỗi"
-      default:
-        return "Không xác định"
-    }
-  }
+  // const getStatusText = (status: UploadedFile["status"]) => {
+  //   switch (status) {
+  //     case "completed":
+  //       return "Hoàn thành"
+  //     case "uploading":
+  //       return "Đang tải lên"
+  //     case "processing":
+  //       return "Đang xử lý"
+  //     case "error":
+  //       return "Lỗi"
+  //     default:
+  //       return "Không xác định"
+  //   }
+  // }
 
 
   const handleUpload = async (file: File) => {
@@ -175,7 +206,7 @@ export function FileUpload() {
     console.log("Uploaded response:", data);
   };
 
-  const handleSave = async (type: "customers" | "weather" | "flights" | "dishes" | "ingredients") => {
+  const handleSave = async (type: FileType) => {
     // Confirm
     const ok = confirm("Xác nhận lưu mô hình?");
     if (!ok) return;
@@ -187,6 +218,9 @@ export function FileUpload() {
         break
       case "flights":
         file = flightFile
+        break
+      case "refill":
+        file = logRefillFile
         break
     }
 
@@ -232,9 +266,8 @@ export function FileUpload() {
 
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: "customers" | "weather" | "flights" | "dishes" | "ingredients") => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: FileType) => {
     const file = event.target.files?.[0]
-    console.log('kjdfhnmbfjngv');
 
     if (
       file &&
@@ -249,6 +282,8 @@ export function FileUpload() {
         case "flights":
           setFlightFile(file)
           break
+        case "refill":
+          setLogRefillFile(file)
       }
     } else {
       alert("Vui lòng chọn file Excel (.xlsx hoặc .xls)")
@@ -256,8 +291,20 @@ export function FileUpload() {
   }
   return (
     <div className="space-y-6">
+      {files.map((file, index) =>
+        <CardUpload
+          key={index}
+          type={file.type}
+          title={file.title}
+          onSave={() => handleSave(file.type)}
+          onFileChange={(e) => handleFileUpload(e, file.type)}
+        ></CardUpload>
+      )}
+
+
+
       {/* Upload Area */}
-      <Card>
+      {/* <Card>
         <CardHeader className="flex justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -269,25 +316,8 @@ export function FileUpload() {
           <Button onClick={() => handleSave("customers")}>Lưu vào CSDL</Button>
         </CardHeader>
         <CardContent>
-          {/* <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-colors ${isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-              }`}
-          >
-            <input {...getInputProps()} />
-            <Upload className="h-7 w-7 text-muted-foreground mx-auto mb-4" />
-            {isDragActive ? (
-              <p className="text-primary font-medium">Thả file vào đây...</p>
-            ) : (
-              <div>
-                <p className="text-foreground font-medium mb-2">Kéo thả file vào đây hoặc click để chọn</p>
-                <p className="text-sm text-muted-foreground">Hỗ trợ: .xlsx, .xls, .csv (tối đa 10MB)</p>
-              </div>
-            )}
-          </div> */}
-
           <div className="space-y-2">
-            <Label htmlFor="excel-file-customers">Chọn file Excel dữ liệu khách hàng<span className="text-red-500">*</span></Label>
+            <Label htmlFor="excel-file-customers">Chọn file Excel dữ liệu hành khách sử dụng phòng chờ<span className="text-red-500">*</span></Label>
             <div className="flex items-center gap-2">
               <Input
                 id="excel-file-customers"
@@ -299,12 +329,11 @@ export function FileUpload() {
               <Upload className="h-4 w-4 text-muted-foreground" />
             </div>
           </div>
-
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Upload Dữ liệu chuyến bay */}
-      <Card>
+      {/* <Card>
         <CardHeader className="flex justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -330,15 +359,48 @@ export function FileUpload() {
             </div>
           </div>
         </CardContent>
-      </Card>
-      {/* Upload thời tiết */}
+      </Card> */}
+      {/* Upload file 1og refill */}
+      {/* <Card>
+        <CardHeader className="flex justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Tải lên nhật ký bổ sung món ăn  <span className="text-red-500">*</span>
+            </CardTitle>
+            <CardDescription>Tải lên file Excel (.xlsx, .xls) hoặc CSV </CardDescription>
+          </div>
+          <Button onClick={() => handleSave("customers")}>Lưu vào CSDL</Button>
+
+        </CardHeader>
+        <CardContent>
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-colors ${isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+              }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="h-7 w-7 text-muted-foreground mx-auto mb-4" />
+            {isDragActive ? (
+              <p className="text-primary font-medium">Thả file vào đây...</p>
+            ) : (
+              <div>
+                <p className="text-foreground font-medium mb-2">Kéo thả file vào đây hoặc click để chọn</p>
+                <p className="text-sm text-muted-foreground">Hỗ trợ: .xlsx, .xls, .csv (tối đa 10MB)</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card> */}
+
+      {/* Upload file 1og refill */}
       {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Tải lên dữ liệu thời tiết <span className="text-red-500">*</span>
+            Tải lên nhật ký bổ sung món ăn  <span className="text-red-500">*</span>
           </CardTitle>
-          <CardDescription>Tải lên file Excel (.xlsx, .xls) hoặc CSV để huấn luyện lại model</CardDescription>
+          <CardDescription>Tải lên file Excel (.xlsx, .xls) hoặc CSV </CardDescription>
         </CardHeader>
         <CardContent>
           <div
