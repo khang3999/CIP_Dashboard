@@ -1,6 +1,6 @@
 "use client"
-import { OveriewParams, PresetRange, Region, Store, Timeslot } from '@/types';
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import { FoodDistribution, OveriewParams, PresetRange, Region, Store, Timeslot } from '@/types';
+import React, { createContext, ReactNode, useContext, useRef, useState } from 'react';
 import { useAppProvider } from './app-provider';
 import { DateRange } from 'react-day-picker';
 // Data context interface
@@ -14,12 +14,14 @@ interface OverviewContextType {
   selectedTimeslot: Timeslot | null
   selectedPresetRange: PresetRange | null
   params: OveriewParams | null
+  // foodsDataShared: FoodDistribution[],
+  foodsDataShared: FoodDistribution[]
   setSelectedRegion: (region: Region | null) => void
   setSelectedStore: (store: Store | null) => void
   setSelectedTimeslot: (timeslot: Timeslot | null) => void
   setSelectedPresetRange: (presetRange: PresetRange | null) => void
   setParams: (params: OveriewParams) => void
-
+  setFoodsDataShared: (foodDistributionData: FoodDistribution[]) => void
   // Loading states
   // isLoading: boolean
   // setIsLoading: (loading: boolean) => void
@@ -39,6 +41,10 @@ const OverviewProvider = ({ children }: { children: ReactNode }) => {
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [selectedPresetRange, setSelectedPresetRange] = useState<any | null>(null)
   const [selectedTimeslot, setSelectedTimeslot] = useState<Timeslot | null>(null)
+  const [foodsDataShared, setFoodsDataShared] = useState<FoodDistribution[]>([])
+  // const [foodsDataShared, setFoodsDataShared] = useState<FoodDistribution[]>([])
+  // const foodsDataShared = useRef<FoodDistribution[]>([])
+
   const [params, setParams] = useState<OveriewParams>({
     timeType: "preset",
     region_id: undefined,
@@ -61,7 +67,9 @@ const OverviewProvider = ({ children }: { children: ReactNode }) => {
     getStoresForRegion,
     setSelectedTimeslot,
     setSelectedPresetRange,
-    setParams
+    setParams,
+    foodsDataShared,
+    setFoodsDataShared
     // isLoading,
     // setIsLoading,
     // refreshData,
@@ -77,5 +85,11 @@ export function useOverviewProvider() {
   }
   return context
 }
+
+// Helper hooks for specific data
+export function useOverviewChart() {
+
+}
+
 
 export default OverviewProvider;

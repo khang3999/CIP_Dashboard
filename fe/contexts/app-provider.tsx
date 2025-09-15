@@ -137,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
 
-// Custom hook to use data context
+// Custom hook to use data context --- Hook nay khi cho 
 export function useAppProvider() {
   const context = useContext(AppContext)
   if (context === undefined) {

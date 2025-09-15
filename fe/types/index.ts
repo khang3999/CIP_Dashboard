@@ -78,20 +78,23 @@ export interface LoungageUsage {
 }
 
 export interface FoodDistribution {
-    id: string
+    dishId: string
     storeId: number
-    date: string
+    timeslotId: number
     foodType: string
+    name: string
     quantity: number
-    percentage: number
 }
 
 export interface IngredientDistribution {
-    id: string
-    storeId: number
-    date: string
-    ingredient: string
-    quantity: number
-    percentage: number
+    ingredientId: string
+    ingredientName: string
+    totalAmount: number
 }
-
+export interface Ingredient {
+    dishId: string
+    dishName: string
+    ingredientId: string
+    ingredientName: string
+    amount: number
+}

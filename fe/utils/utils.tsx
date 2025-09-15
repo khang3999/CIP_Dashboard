@@ -47,8 +47,10 @@ export function getDateRangeOfPast(presetRange: PresetRange) {
     }
 
   }
+  const startDateStr = startDate.toLocaleDateString("en-CA")
+  const endDateStr = endDate.toLocaleDateString("en-CA")
 
-  return { startDate, endDate }
+  return { "startDate": startDateStr, "endDate": endDateStr }
 }
 
 export const formatDate = (d: Date) => {
@@ -151,4 +153,11 @@ export function formatTimestampVN(timestamp: string | Date) {
     second: "2-digit",
     hour12: false, // 24h
   });
+}
+
+export function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360) // 0 - 359
+  const saturation = 70 + Math.random() * 30   // 70% - 100%
+  const lightness = 50 + Math.random() * 10    // 50% - 60%
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
 }

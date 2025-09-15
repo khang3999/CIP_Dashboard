@@ -1,79 +1,41 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label } from "recharts"
+import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label, Legend, ComposedChart } from "recharts"
 import { useLoungeUsage, useFoodDistribution, useIngredientDistribution } from "@/contexts/app-provider"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 // import { CustomParams } from "./prediction-controls"
 // import { supabase } from "@/utils/supabase/client"
-import { LoungageUsage, Timeslot } from "@/types"
-import { generateTicks, getDateRangeOfPast } from "@/utils/utils"
+import { FoodDistribution, Ingredient, IngredientDistribution, LoungageUsage, OveriewParams, PredictionParams, Timeslot } from "@/types"
+import { generateTicks, getDateRangeOfPast, getRandomColor } from "@/utils/utils"
 import { supabase } from "@/utils/supabase/client"
 import { useOverviewProvider } from "@/contexts/overview-context"
-import { Divide } from "lucide-react"
-// const presetRanges = [
-//   {
-//     id: 1,
-//     count: 0,
-//     presetRange: "Tất cả",
-//     type: "date",
-//     time_status: "current"
-//   },
-//   {
-//     id: 2,
-//     count: 1,
-//     presetRange: "Hôm qua",
-//     type: "date",
-//     time_status: "past"
-//   },
-//   {
-//     id: 3,
-//     count: 1,
-//     presetRange: "tuần trước",
-//     type: "week",
-//     time_status: "past"
-//   },
-//   {
-//     id: 4,
-//     count: 1,
-//     presetRange: "tháng trước",
-//     type: "month",
-//     time_status: "past"
-//   }
-// ]
 
 const COLORS = ["#059669", "#0891b2", "#7c3aed", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#2563eb"]
-export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any, selectedTimeslot?: Timeslot }) {
-  // const { regions, stores, timeslots, selectedRegion, setSelectedRegion, selectedStore, setSelectedStore, selectedPresetRange, setSelectedPresetRange, selectedTimeslot, setSelectedTimeslot, getStoresForRegion, params } = useOverviewProvider()
-  const [availableTimeslot, setAvailableTimeslot] = useState<Timeslot[]>([])
+export function PassengerShiftChart({ params }: { params?: OveriewParams | null }) {
   const [loungeUsageData, setLoungeUsageData] = useState<LoungageUsage[]>([])
 
-  // // Get yesterday's data by shifts
-  // const yesterday = new Date()
-  // yesterday.setDate(yesterday.getDate() - 1)
-  // const yesterdayStr = yesterday.toISOString().split("T")[0]
-
   const getChartData = async (postgre_func_name: string, params: any) => {
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
-
-    console.log(params, 'param');
+    let startDate: Date | string | undefined;
+    let endDate: Date | string | undefined;
 
 
     if (params.dateRange) {
       startDate = params.dateRange.from;
       endDate = params.dateRange.to;
     } else if (params.presetRange) {
-      ({ startDate, endDate } = getDateRangeOfPast(params.presetRange));
+      const res = getDateRangeOfPast(params.presetRange);
+      startDate = res.startDate
+      endDate = res.endDate
     }
 
     const postgreParams = {
       p_region_id: params.region_id,
       p_store_id: params.store_id,
       p_timeslot_id: params.timeslot_id,
-      p_start_date: startDate?.toLocaleDateString("en-CA"),
-      p_end_date: endDate?.toLocaleDateString("en-CA")
+      p_start_date: startDate,
+      p_end_date: endDate
     }
     console.log(postgreParams);
     // Func
@@ -109,15 +71,12 @@ export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any
       setLoungeUsageData([])
     }
   }
-  // console.log(selectedTimeslot, "called");
-
   // Khi thời gian và ca thay đổi thì gọi hàm tính lại data biểu đồ
   useEffect(() => {
-    console.log(selectedTimeslot, "called");
-    if (!selectedTimeslot) return
+    if (!params?.timeslot_id) return
     const postgre_func_name = 'get_lounge_usage_customers'
     getChartData(postgre_func_name, params)
-  }, [selectedTimeslot])
+  }, [params?.timeslot_id])
 
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -139,8 +98,8 @@ export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Số lượng khách</CardTitle>
-        <CardDescription>Thống kê lượng khách sử dụng phòng chờ {selectedTimeslot?.timeslot}</CardDescription>
+        <CardTitle>Lượng khách</CardTitle>
+        <CardDescription>Thống kê lượng khách sử dụng phòng chờ</CardDescription>
       </CardHeader>
 
       <CardContent className="flex justify-center">
@@ -149,20 +108,13 @@ export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any
             total_customers: {
               label: "Số khách",
               color: "hsl(var(--chart-1))",
-              
             },
           }}
-          className="w-[80%] px-5 z-10"
+          className="h-[450px] px-5 z-10"
         >
           <ResponsiveContainer width="100%" height="100%">
-            {/* <BarChart data={availableTimeslot}>
-              <XAxis dataKey="shift" />
-              <YAxis />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="passengers" fill="#059669" />
-            </BarChart> */}
             {loungeUsageData.length != 0 ?
-              <LineChart data={loungeUsageData} margin={{ top: 15, bottom: 15}}>
+              <LineChart data={loungeUsageData} margin={{ top: 15, bottom: 15 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -181,13 +133,16 @@ export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any
                     // return `${d.getDate()}/${d.getMonth() + 1}`;
                   }}
                 >
-                  <Label value={params?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight"  dx={5} dy={5} />
+                  <Label value={params?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
                 </XAxis>
-                <YAxis>
+                <YAxis 
+                  padding={{ top: 10 }}
+                >
                   <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
                 </YAxis>
                 {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
                 <ChartTooltip content={<ChartTooltipContent />} />
+                {/* <Legend content={<ChartLegendContent />} /> */}
                 <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
               </LineChart>
               :
@@ -200,22 +155,81 @@ export function PassengerShiftChart({ params, selectedTimeslot }: { params?: any
     </Card>)
 }
 
-export function FoodDistributionChart() {
-  const { foodDistribution } = useFoodDistribution()
+export function FoodDistributionChart({ params }: { params?: OveriewParams | null }) {
+  const [foodDistributionData, setFoodDistributionData] = useState<FoodDistribution[]>([])
+  const { foodsDataShared, setFoodsDataShared }: any = useOverviewProvider()
+  const getChartData = async (postgreFunc: string, params: OveriewParams) => {
+    let startDate: Date | string | undefined;
+    let endDate: Date | string | undefined;
 
-  // Aggregate food data
-  const foodData = foodDistribution.reduce(
-    (acc, item) => {
-      const existing = acc.find((f) => f.name === item.foodType)
-      if (existing) {
-        existing.value += item.quantity
-      } else {
-        acc.push({ name: item.foodType, value: item.quantity })
-      }
-      return acc
-    },
-    [] as { name: string; value: number }[],
-  )
+    console.log(params, 'param');
+
+
+    if (params.dateRange) {
+      startDate = params.dateRange.from;
+      endDate = params.dateRange.to;
+    } else if (params.presetRange) {
+      const res = getDateRangeOfPast(params.presetRange);
+      startDate = res.startDate
+      endDate = res.endDate
+
+    }
+
+    const postgreParams = {
+      p_store_id: params.store_id,
+      p_timeslot_id: params.timeslot_id,
+      p_start_date: startDate,
+      p_end_date: endDate
+    }
+
+    //       create or replace function get_dish_consumed_sum(
+    //   p_store_id int,
+    //   p_timeslot_id int,
+    //   p_start_date date,
+    //   p_end_date date
+    // )
+    // returns table (
+    //   id int,
+    //   quantity numeric,
+    //   storeId int,
+    //   timeslotId int,
+    //   date date,
+    //   foodType text,
+    //   name text,
+    //   pax int
+    // ) language sql as $$
+    //   select dish_id as id, sum(consumed_amount_suat) as quantity, store_id as storeId, timeslot_id as timeslotId, date, food_type as foodType, dish_name as name , pax
+    //   from cip_log_refill
+    //   where store_id = p_store_id
+    //     and timeslot_id = p_timeslot_id
+    //     and date between p_start_date and p_end_date
+    //    group by dish_id, store_id, timeslot_id, date, food_type, dish_name, pax;
+    // $$;
+    // id: string
+    // storeId: number
+    // timeslotId: number
+    // date: string
+    // foodType: string
+    // name: string
+    // quantity: number
+    // pax: number
+    try {
+      const { data, error } = await supabase.rpc(postgreFunc, postgreParams)
+      if (error) throw error
+      console.log(data, "food");
+      // setChartConfig(generateChartConfig(data))
+      setFoodsDataShared(data)
+      setFoodDistributionData(data)
+    } catch (err) {
+      console.error("Error fetching chart data:", err)
+      setFoodDistributionData([])
+    }
+  }
+  useEffect(() => {
+    if (!params?.timeslot_id) return
+    const postgreFunctionName = 'get_dish_consumed_sum'
+    getChartData(postgreFunctionName, params)
+  }, [params?.timeslot_id])
 
   return (
     <Card>
@@ -223,31 +237,27 @@ export function FoodDistributionChart() {
         <CardTitle>Phân bổ món ăn</CardTitle>
         <CardDescription>Tỷ lệ các món ăn được phục vụ</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex justify-center">
         <ChartContainer
-          config={{
-            food: {
-              label: "Món ăn",
-              color: "hsl(var(--chart-2))",
-            },
-          }}
-          className="h-[300px]"
+          config={{}}
+          className="h-[500px] w-[100%] px-5 z-10"
+
         >
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart >
               <Pie
-                data={foodData}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                dataKey="value"
+                data={foodDistributionData}
+                outerRadius={150}
+                dataKey="quantity"
+                nameKey="name"
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {foodData.map((entry, index) => (
+                {foodDistributionData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
             </PieChart>
           </ResponsiveContainer>
         </ChartContainer>
@@ -256,55 +266,127 @@ export function FoodDistributionChart() {
   )
 }
 
-export function IngredientDistributionChart() {
-  const { ingredientDistribution } = useIngredientDistribution()
+export function IngredientDistributionChart({ params }: { params?: OveriewParams | null }) {
+  const [ingredientDistributionData, setIngredientDistributionData] = useState<any>([])
+  const { foodsDataShared, setFoodsDataShared }: any = useOverviewProvider()
 
-  // Aggregate ingredient data
-  const ingredientData = ingredientDistribution.reduce(
-    (acc, item) => {
-      const existing = acc.find((i) => i.name === item.ingredient)
-      if (existing) {
-        existing.value += item.quantity
-      } else {
-        acc.push({ name: item.ingredient, value: item.quantity })
-      }
-      return acc
-    },
-    [] as { name: string; value: number }[],
-  )
+  const calculateIngredients = (dishes: FoodDistribution[], bom: Ingredient[]) => {
+    const ingredientTotals: Record<string, IngredientDistribution> = {}
+    dishes.map((dish: FoodDistribution) => {
+      const bomItems = bom.filter(b => b.dishId === dish.dishId);
+      bomItems.forEach(b => {
+        const totalAmount = dish.quantity * b.amount;
+        if (!ingredientTotals[b.ingredientId]) {
+          ingredientTotals[b.ingredientId] = {
+            ingredientId: b.ingredientId,
+            ingredientName: b.ingredientName,
+            totalAmount: 0,
+          }
+        }
+        ingredientTotals[b.ingredientId].totalAmount += totalAmount
+      });
+    });
+    return Object.values(ingredientTotals)
+  }
 
+  const getBOM = async () => {
+    try {
+      const { data, error } = await supabase.from("cip_bom").select("dishId:dish_id, dishName:dish_name, ingredientId: ingredient_id, ingredientName: ingredient_name, amount: converted_amount_g")
+      if (error) throw error
+      return data as Ingredient[]
+    } catch (err) {
+      console.error("Error fetching regions:", err)
+      return []
+    }
+  }
+  useEffect(() => {
+    if (foodsDataShared.length == 0) {
+      console.log("FoodsDataShared data is empty.");
+      return
+    }
+    console.log("changeeeeed");
+    const process = async () => {
+      const bom = await getBOM()
+      const ingredientsDistribution = calculateIngredients(foodsDataShared, bom)
+      console.log(ingredientsDistribution, "ingredient");
+      setIngredientDistributionData(ingredientsDistribution)
+    }
+    process()
+  }, [foodsDataShared])
   return (
     <Card>
       <CardHeader>
         <CardTitle>Phân bổ nguyên liệu</CardTitle>
-        <CardDescription>Tỷ lệ sử dụng các nguyên liệu</CardDescription>
+        <CardDescription>Số lượng các loại nguyên liệu đã sử dụng</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex justify-center">
         <ChartContainer
           config={{
-            ingredient: {
-              label: "Nguyên liệu",
-              color: "hsl(var(--chart-3))",
-            },
+            // ingredientName: {
+            //   label: "Nguyên liệu",
+            //   color: "hsl(var(--chart-3))",
+            // },
           }}
-          className="h-[300px]"
+          className="h-[500px] w-[100%] px-5 z-10"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            {/* <PieChart>
               <Pie
-                data={ingredientData}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                dataKey="value"
+                data={ingredientDistributionData}
+                outerRadius={150}
+                dataKey="totalAmount"
+                nameKey="ingredientName"
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {ingredientData.map((entry, index) => (
+                {ingredientDistributionData.map((entry: any, index: number) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <ChartTooltip content={<ChartTooltipContent />} />
-            </PieChart>
+              <ChartLegend content={<ChartLegendContent nameKey="ingredientName" />} />
+            </PieChart> */}
+            <ComposedChart
+              data={ingredientDistributionData}
+              // margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
+              // barCategoryGap="20%"
+              barSize={15}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                type="category"
+                dataKey="ingredientName"
+                height={70}
+                padding={{ left: 5 }}
+                tick={{
+                  fontSize: 11,
+                  fontWeight: "600",
+                  // transform: "rotate(-45)",    
+                  // xoay chữ
+                  angle: -45,
+                  textAnchor: "end" // neo cuối khi xoay
+                }}
+                interval={0}
+              />
+              <YAxis
+                dataKey="totalAmount"
+                type="number"
+                // width={150}
+                padding={{ bottom: 0, top: 24 }}
+                tick={{
+                  fontSize: 11,
+                  fontWeight: "600",
+                }}
+                height={50}
+              >
+
+                <Label value="Đơn vị (g)" position="insideTopLeft" dy={-5} />
+              </YAxis>
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="totalAmount" fill="#db6302" name="Sử dụng" />
+              {/* <Line type="monotone" dataKey="totalAmount" stroke="#ff7300" name="Tồn kho" /> */}
+              {/* Đường ROP ngang */}
+              {/* <Line dataKey="ROP" stroke="green" strokeDasharray="3 3" name="ROP" /> */}
+            </ComposedChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>

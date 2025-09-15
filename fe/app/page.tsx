@@ -31,13 +31,13 @@ function OverviewSection() {
     <div className="space-y-6">
       <SimpleSelector />
       <div>
-        <PassengerShiftChart params={params} selectedTimeslot={selectedTimeslot || undefined} />
+        <PassengerShiftChart params={params}/>
       </div>
       <div>
-        <FoodDistributionChart />
+        <FoodDistributionChart params={params} />
       </div>
       <div>
-        <IngredientDistributionChart />
+        <IngredientDistributionChart params={params} />
       </div>
     </div>
     // </OverviewProvider>
@@ -58,7 +58,7 @@ function PredictionsSection() {
       console.log("Params is null");
       return
     }
-    // setIsLoading(true)
+    setIsLoading(true)
     // await new Promise((resolve) => setTimeout(resolve, 2000))
     setPredictionParams(predictionParams)
     let startDate, endDate
@@ -133,46 +133,47 @@ function PredictionsSection() {
 
                       },
                     }}
-                    className="w-[100%] px-5 z-10"
+                    className="h-[450px] px-5 z-10"
                   >
                     {/* <div className='h-full'> */}
-                      <ResponsiveContainer width="100%" height="100%" className={"select-none"}>
-                        {resultCustomers?.length != 0 ?
-                          <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultCustomers, predictionParams) })}
-                              // ticks={generateTicks(loungeUsageData, params)}
-                              padding={{ left: 30, right: 30 }}
-                              // interval={0}
-                              tickFormatter={(str) => {
-                                const d = new Date(str);
-                                return predictionParams?.presetRange?.time_status === 'today'
-                                  ? `${d.getMonth() + 1}/${d.getFullYear()}`  // hiển thị tháng
-                                  : `${d.getDate()}/${d.getMonth() + 1}`;     // hiển thị ngày
-                                // if (params?.presetRange?.time_status === 'today') {
-                                //   return `${d.getMonth() + 1}`;
-                                // }
-                                // return `${d.getDate()}/${d.getMonth() + 1}`;
-                              }}
-                            >
-                              <Label value={predictionParams?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
-                            </XAxis>
-                            <YAxis
-                              tick={{ style: { userSelect: "none", cursor: "default" } }}
-                            >
-                              <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
-                            </YAxis>
-                            {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
-                          </LineChart>
-                          :
-                          <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>
+                    <ResponsiveContainer width="100%" height="100%" className={"select-none"}>
+                      {resultCustomers?.length != 0 ?
+                        <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            {...(predictionParams?.presetRange?.time_status === 'today' && { ticks: generateTicks(resultCustomers, predictionParams) })}
+                            // ticks={generateTicks(loungeUsageData, params)}
+                            padding={{ left: 30, right: 30 }}
+                            // interval={0}
+                            tickFormatter={(str) => {
+                              const d = new Date(str);
+                              return predictionParams?.presetRange?.time_status === 'today'
+                                ? `${d.getMonth() + 1}/${d.getFullYear()}`  // hiển thị tháng
+                                : `${d.getDate()}/${d.getMonth() + 1}`;     // hiển thị ngày
+                              // if (params?.presetRange?.time_status === 'today') {
+                              //   return `${d.getMonth() + 1}`;
+                              // }
+                              // return `${d.getDate()}/${d.getMonth() + 1}`;
+                            }}
+                          >
+                            <Label value={predictionParams?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
+                          </XAxis>
+                          <YAxis
+                            padding={{ top: 10 }}
+                            tick={{ style: { userSelect: "none", cursor: "default" } }}
+                          >
+                            <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
+                          </YAxis>
+                          {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
+                        </LineChart>
+                        :
+                        <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>
 
-                        }
-                      </ResponsiveContainer>
+                      }
+                    </ResponsiveContainer>
                     {/* </div> */}
                   </ChartContainer>
                 </CardContent>
@@ -186,25 +187,15 @@ function PredictionsSection() {
             </>
           )}
         </div>
-      </div>
-      {resultFoods && resultIngredients ?
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          {/*  Chart tích hợp */}
-          {/* <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} /> */}
-          {/* MÓN ĂN */}
-          {/* <Card> */}
-          {/* <CardHeader>
-              <CardTitle>Số lượng món và nguyên liệu</CardTitle>
-              <CardDescription>Dự đoán món ăn, nguyên liệu, thời điểm đặt hàng {selectedTimeslot?.timeslot}</CardDescription>
-            </CardHeader> */}
-          {/* <CardContent className="flex justify-center"> */}
-          <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} />
-          {/* </CardContent> */}
-          {/* </Card> */}
 
-        </div> :
-        <></>
-      }
+        {resultFoods && resultIngredients ?
+          <div className="col-span-3 lg:col-span-3">
+            <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} />
+          </div> :
+          <></>
+        }
+      </div>
+
     </div>
   )
 }

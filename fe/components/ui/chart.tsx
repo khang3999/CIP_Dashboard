@@ -86,13 +86,13 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
             ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
 ${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
+                .map(([key, itemConfig]) => {
+                  const color =
+                    itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+                    itemConfig.color
+                  return color ? `  --color-${key}: ${color};` : null
+                })
+                .join("\n")}
 }
 `
           )
@@ -233,7 +233,7 @@ function ChartTooltipContent({
                       </span>
                     </div>
                     {item.value && (
-                      <span className="text-foreground font-mono font-medium tabular-nums">
+                      <span className="text-foreground font-mono font-medium tabular-nums pl-3">
                         {item.value.toLocaleString()}
                       </span>
                     )}
@@ -269,8 +269,14 @@ function ChartLegendContent({
 
   return (
     <div
+      // className={cn(
+      //   "flex items-center justify-center gap-4",
+      //   verticalAlign === "top" ? "pb-3" : "pt-3",
+      //   className
+      // )}
       className={cn(
-        "flex items-center justify-center gap-4",
+        "grid gap-2 w-full",                   // 👉 đổi flex thành grid
+        "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4", // 👉 số cột responsive
         verticalAlign === "top" ? "pb-3" : "pt-3",
         className
       )}
@@ -296,7 +302,8 @@ function ChartLegendContent({
                 }}
               />
             )}
-            {itemConfig?.label}
+            {/* {itemConfig?.label} */}
+            {itemConfig?.label || item.value}
           </div>
         )
       })}
@@ -316,8 +323,8 @@ function getPayloadConfigFromPayload(
 
   const payloadPayload =
     "payload" in payload &&
-    typeof payload.payload === "object" &&
-    payload.payload !== null
+      typeof payload.payload === "object" &&
+      payload.payload !== null
       ? payload.payload
       : undefined
 
