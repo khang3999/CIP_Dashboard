@@ -281,7 +281,6 @@ export default function Dashboard() {
             title={sectionTitles[activeSection as keyof typeof sectionTitles]}
             subtitle={sectionSubtitles[activeSection as keyof typeof sectionSubtitles]}
           />
-
           {renderSection()}
         </main>
       </div>

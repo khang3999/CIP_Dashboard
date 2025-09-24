@@ -16,6 +16,10 @@ import re
 from datetime import date, datetime
 from collections import defaultdict
 from typing import List, Dict, Any
+import json
+import tempfile
+import os
+from app.config import CUSTOM_TMP_DIR
 
 weather_service = WeatherService(supabase)
 CONFIG_MODEL_PATH = "mappings.joblib"
@@ -64,14 +68,14 @@ class PredictService:
         df_flights = pd.DataFrame(flights.data)
         # print(df_flights.columns,"tytyty1")
         # 4. Lấy model
-        model = self._get_model(region_id)
+        model_customer = self._get_model_customer(region_id)
         result_customers = _forecast_customers(
             start_date=start_date,
             end_date=end_date,
             df_feat_latest=df_feat_latest,
             df_flights=df_flights,
             df_weather=df_weather,
-            model=model,
+            model=model_customer,
             lags=[1, 7, 14, 28],
             roll_windows=[3, 7, 14, 28],
         )
@@ -81,21 +85,33 @@ class PredictService:
         ### Dự đoán phân bổ món ăn
         # Load config, và trace
         # trace_path = f"trace_model_{'qn' if region_id == 2 else 'qt'}.nc"
-        trace_path = "trace_model_qn.nc"
-        trace_bytes = self.supabase.storage.from_(BUCKET_NAME).download(trace_path)
-        # Load config
-        mappings_bytes = self.supabase.storage.from_(BUCKET_NAME).download(
-            CONFIG_MODEL_PATH
+        model_food_res = (
+            self.supabase.table("cip_models")
+            .select("file_path")
+            .eq("region_id", region_id)
+            .eq("type", "food")
+            .eq("status", "using")
+            .execute()
         )
+        if not model_food_res.data or len(model_food_res.data) == 0:
+            raise ValueError(f"No model entry found for region {region_id}")
 
-        # # tạo BytesIO
-        # 1) Ghi ra file vật lý tạm thời
-        with open("trace_model.nc", "wb") as f:
-            f.write(trace_bytes)
-        # 2) Load lại bằng ArviZ
-        trace_model = az.from_netcdf("trace_model.nc")
+        idata_trace_path = model_food_res.data[0]["file_path"]
+        # trace_path = "trace_model_qn.nc"
+        idata_trace_bytes = self.supabase.storage.from_(BUCKET_NAME).download(
+            idata_trace_path
+        )
+        # Ghi ra file trên máy
+        file_name = "idata_trace_bytes_to_database.nc"
+        # Tạo đường dẫn đầy đủ
+        file_path = os.path.join(CUSTOM_TMP_DIR, file_name)
+        # Ghi file byte lấy từ supabase thành file
+        with open(file_path, "wb") as f:
+            f.write(idata_trace_bytes)
+        # Đọc file bằng az sẽ chuyển thành InferenceData
+        idata_trace = az.from_netcdf(file_path)
 
-        mappings_model = joblib.load(BytesIO(mappings_bytes))
+        print(idata_trace.groups(), "idata")
 
         result_foods = []
         result_ingredients = []
@@ -105,8 +121,8 @@ class PredictService:
             ### Dự báo món ăn
             for row in result_customers:
                 allocation = forecast_dishes(
-                    trace=trace_model,
-                    mappings=mappings_model,
+                    idata_trace=idata_trace,
+                    # mappings=mappings_model,
                     pax=row["total_customers"],
                     store_id=store_id,
                     timeslot_id=timeslot_id,
@@ -184,11 +200,12 @@ class PredictService:
         )
         return res
 
-    def _get_model(self, region_id):
+    def _get_model_customer(self, region_id):
         res = (
             self.supabase.table("cip_models")
             .select("file_path")
             .eq("region_id", region_id)
+            .eq("type", "customer")
             .eq("status", "using")
             .execute()
         )
@@ -413,98 +430,122 @@ def normalize_datetime(dt):
     return dt
 
 
-def forecast_dishes(trace, mappings, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.95]):
+def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.95]):
     """
-    Phân bổ món ăn dựa trên trace, mappings và số khách dự báo (PAX).
-
-    Args:
-        trace: arviz InferenceData (đã load từ .nc bằng az.from_netcdf)
-        mappings: dict chứa các ánh xạ (item_codes, store_codes, timeslot_codes, item_store_idx, item_timeslot_idx)
-        pax: int, số khách dự báo
-        store_id: str, mã cửa hàng (vd: "HCM01")
-        timeslot: str, ca ăn (vd: "lunch")
-        hdi_probs: list, mức HDI muốn tính (vd: [0.8, 0.95])
-
     Returns:
         dict: {Item_ID: {"forecast": int, "mu": float, "hdi80": (low, high), "hdi95": (low, high)}}
     """
     # Unpack mappings
-    item_codes = mappings["item_codes"]
-    store_codes = mappings["store_codes"]
-    timeslot_codes = mappings["timeslot_codes"]
-    item_store_idx = mappings["item_store_idx"]
-    item_timeslot_idx = mappings["item_timeslot_idx"]
+    mappings = json.loads(idata_trace.attrs["mappings"])
+    dish_codes = mappings["dish_codes"]
 
-    # Posterior mean
-    mu_item_mean = trace.posterior["mu_item"].mean(dim=("chain", "draw")).values
+    # food_type_codes = mappings["food_type_codes"]
+    # food_type_codes = {int(k): v for k, v in food_type_codes.items()}
+
+    timeslot_codes = mappings["timeslot_codes"]
+    timeslot_codes = {int(k): v for k, v in timeslot_codes.items()}
+
+    store_codes = mappings["store_codes"]
+    store_codes = {int(k): v for k, v in store_codes.items()}
+
+    # dishes_list = mappings["dishes_list"]
+    timeslot_idx_obs = np.array(mappings["timeslot_idx_obs"], dtype=int)
+    store_idx_obs = np.array(mappings["store_idx_obs"], dtype=int)
+    dish_idx_obs = np.array(mappings["dish_idx_obs"], dtype=int)
+
+    print("store_codes:", store_codes)
+    print("dish_codes:", dish_codes)
+    # "timeslot_idx_obs": timeslot_idx_obs,
+    #             "store_idx_obs": store_idx_obs,
+    # Posterior  cho món có độ dài bằng sô món
+    mu_inter_mean = idata_trace.posterior["mu_interaction"].mean(dim=("chain", "draw"))
 
     # HDI intervals
-    hdi_results = {p: az.hdi(trace.posterior["mu_item"], hdi_prob=p) for p in hdi_probs}
+    hdi_results = {
+        p: az.hdi(idata_trace.posterior["mu_interaction"], hdi_prob=p)
+        for p in hdi_probs
+    }
 
     # Filter theo store & timeslot
-    store_idx = store_codes[store_id]
-    timeslot_idx = timeslot_codes[timeslot_id]
-    mask = (item_store_idx == store_idx) & (item_timeslot_idx == timeslot_idx)
+    store_index = store_codes[store_id]
+    timeslot_index = timeslot_codes[timeslot_id]
+    # mask = (store_idx_obs == store_index) & (timeslot_idx_obs == timeslot_index)
 
-    mu_item_filtered = mu_item_mean[mask]
-    selected_items = [it for it, idx in item_codes.items() if mask[idx]]
+    # Mảng chứa cr_mean có thứ tự theo mask
+    # mu_item_filtered = mu_item_mean[mask]
+    # dish_idx_filtered = dish_idx_obs[mask]
+    # Mảng chứa tên món có thứ tự theo mask
+    # selected_items = [it for it, idx in dish_codes.items() if mask[idx]]
 
-    if len(selected_items) == 0:
-        return {}
+    # print(selected_items, "item_codes 1")
+    # print(dish_codes, "item_codes")
+    # if len(selected_items) == 0:
+    #     return {}
 
-    # Xác suất phân bổ
-    probs = mu_item_filtered / mu_item_filtered.sum()
+    # # Xác suất phân bổ
+    # probs = mu_item_filtered / mu_item_filtered.sum()
 
     # Phân bổ khách
-    allocation = np.random.multinomial(pax, probs)
+    # allocation = np.random.multinomial(pax, probs)
+    # allocation = pax * mu_item_filtered
 
     # Build result
     result = {}
-    print(item_codes, "item_codes")
-    for i, item_id in enumerate(selected_items):
-        idx = item_codes[item_id]
-        item_info = {"forecast": int(allocation[i]), "mu": float(mu_item_mean[idx])}
-        # Add HDI
+
+    for dish_id, dish_index in dish_codes.items():
+        # idx = dish_codes[item_id]
+        # item_info = {"forecast": int(allocation[i]), "mu": float(mu_item_filtered[i])}
+        # Lấy mu cho từng dish, timeslot, store
+        mu_hat = float(
+            mu_inter_mean.sel(
+                mu_interaction_dim_0=dish_index,
+                mu_interaction_dim_1=timeslot_index,
+                mu_interaction_dim_2=store_index,
+            ).values
+        )
+        # Số suất dự báo = pax * mu_hat
+        forecast = int(round(pax * mu_hat))
+        item_info = {"forecast": forecast, "mu": mu_hat}
+
+        # Thêm HDI cho từng mức
         for p, hdi in hdi_results.items():
-            # dim_item = hdi.dims[0]
-            # low = float(hdi.isel(dim_item=idx).isel(hdi=0).item())
-            # high = float(hdi.isel(dim_item=idx).isel(hdi=1).item())
-            # item_info[f"hdi{int(p * 100)}"] = (low, high)
-
-            # chuyển sang numpy array
-            if isinstance(hdi, xr.Dataset):
-                # Giả sử biến là 'mu_item' trong Dataset
-                hdi_da = hdi["mu_item"]
-            else:
-                hdi_da = hdi
-
-            hdi_np = hdi_da.values  # shape = (n_items, 2)
-            # print(type(hdi_da), "ck")  # phải là xarray.DataArray
-            # print(type(hdi_da.values), "ck")  # phải là numpy.ndarray
-            # print(hdi_da.shape, "ck")  # kiểm tra shape
-            low = float(hdi_np[idx, 0])
-            high = float(hdi_np[idx, 1])
+            hdi_da = hdi["mu_interaction"]
+            low = float(
+                hdi_da.isel(
+                    mu_interaction_dim_0=dish_index,
+                    mu_interaction_dim_1=timeslot_index,
+                    mu_interaction_dim_2=store_index,
+                    hdi=0,
+                ).item()
+            )
+            high = float(
+                hdi_da.isel(
+                    mu_interaction_dim_0=dish_index,
+                    mu_interaction_dim_1=timeslot_index,
+                    mu_interaction_dim_2=store_index,
+                    hdi=1,
+                ).item()
+            )
             item_info[f"hdi{int(p * 100)}"] = (low, high)
 
-        result[item_id] = item_info
+        result[dish_id] = item_info
 
+        # # Add HDI
+        # for p, hdi in hdi_results.items():
+        #     # chuyển sang numpy array
+        #     if isinstance(hdi, xr.Dataset):
+        #         # Giả sử biến là 'mu_item' trong Dataset
+        #         hdi_da = hdi["mu_item"]
+        #     else:
+        #         hdi_da = hdi
+
+        #     hdi_np = hdi_da.values  # shape = (n_items, 2)
+        #     low = float(hdi_np[idx, 0])
+        #     high = float(hdi_np[idx, 1])
+        #     item_info[f"hdi{int(p * 100)}"] = (low, high)
+
+        # result[item_id] = item_info
     return result
-
-
-def load_trace_from_bytes(trace_bytes: bytes):
-    # Tạo file tạm, giữ lại cho đến khi load xong
-    tmp = tempfile.NamedTemporaryFile(suffix=".nc", delete=False)
-    tmp.write(trace_bytes)
-    tmp.flush()
-    tmp.close()  # Đóng file để h5netcdf mở được
-
-    trace_model = az.from_netcdf(tmp.name)
-
-    # Xóa file tạm sau khi load xong
-
-    os.remove(tmp.name)
-
-    return trace_model
 
 
 def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
@@ -550,6 +591,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     df_log = df_log[
         ["date", "store_id", "timeslot_id", "dish_id", "pax", "consumed_amount_suat"]
     ]
+    print(df_food_distribute.columns, "colums")
     df_food_distribute = df_food_distribute[
         ["date", "store_id", "timeslot_id", "dish_id", "pax", "consumed_amount_suat"]
     ]

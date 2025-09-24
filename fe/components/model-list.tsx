@@ -8,93 +8,15 @@ import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Brain, Play, Pause, Trash2, Eye, RefreshCw, Upload, FileSpreadsheet, MapPin, Save, SaveAll, Check } from "lucide-react"
+import { Brain, Play, Pause, Trash2, Eye, RefreshCw, Upload, FileSpreadsheet, MapPin, Save, SaveAll, Check, InfoIcon } from "lucide-react"
 import { useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { useAppProvider } from "@/contexts/app-provider"
-import { Model, Region } from "@/types"
+import { Model, ModelType, Region } from "@/types"
 import { set } from "date-fns"
 import { formatTimestampVN, removeVietnameseTones } from "@/utils/utils"
 import { supabase } from "@/utils/supabase/client"
-
-
-
-
-const mockModels: Model[] = [
-  // {
-  //   id: "1",
-  //   name: "Revenue Prediction Model",
-  //   type: "XGBoost Regressor",
-  //   status: "using",
-  //   accuracy: 96.8,
-  //   training_progress: 100,
-  //   created_at: "2024-01-15",
-  //   training_time: "1h 45m",
-  //   data_size: "50,000 records",
-  //   version: "v2.1",
-  //   // rmse: 0.123
-  // },
-  // {
-  //   id: "2",
-  //   name: "Customer Segmentation",
-  //   type: "K-Means Clustering",
-  //   status: "training",
-  //   accuracy: 0,
-  //   trainingProgress: 67,
-  //   createdAt: "2024-01-20",
-  //   trainingTime: "1h 12m",
-  //   dataSize: "25,000 records",
-  //   version: "v1.3",
-  // },
-  // {
-  //   id: "3",
-  //   name: "Sales Forecasting",
-  //   type: "XGBoost Classifier",
-  //   status: "completed",
-  //   accuracy: 92.4,
-  //   trainingProgress: 100,
-  //   createdAt: "2024-01-10",
-  //   trainingTime: "2h 15m",
-  //   dataSize: "100,000 records",
-  //   version: "v3.0",
-  // },
-  // {
-  //   id: "4",
-  //   name: "Churn Prediction",
-  //   type: "XGBoost Classifier",
-  //   status: "failed",
-  //   accuracy: 0,
-  //   trainingProgress: 45,
-  //   createdAt: "2024-01-18",
-  //   trainingTime: "0h 45m",
-  //   dataSize: "30,000 records",
-  //   version: "v1.0",
-  // },
-  // {
-  //   id: "5",
-  //   name: "Store Performance Prediction",
-  //   type: "XGBoost Regressor",
-  //   status: "completed",
-  //   accuracy: 94.7,
-  //   trainingProgress: 100,
-  //   createdAt: "2024-01-22",
-  //   trainingTime: "1h 28m",
-  //   dataSize: "75,000 records",
-  //   version: "v1.2",
-  // },
-  // {
-  //   id: "6",
-  //   name: "Regional Sales Forecast",
-  //   type: "XGBoost Ensemble",
-  //   status: "training",
-  //   accuracy: 0,
-  //   trainingProgress: 82,
-  //   createdAt: "2024-01-25",
-  //   trainingTime: "2h 05m",
-  //   dataSize: "120,000 records",
-  //   version: "v1.0",
-  // },
-]
+import { FileType } from "./file-upload"
 
 interface ModelListProps {
   onSelectModel: (model: Model) => void
@@ -102,29 +24,18 @@ interface ModelListProps {
 }
 
 export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
-  const [retrainDialogOpen, setRetrainDialogOpen] = useState(false)
+  // const [retrainDialogOpen, setRetrainDialogOpen] = useState(false)
   const [createNewModelDialogOpen, setCreateNewModelDialogOpen] = useState(false)
   const [addExistingDialogOpen, setAddExistingDialogOpen] = useState(false)
-  const [selectedModelForRetrain, setSelectedModelForRetrain] = useState<Model | null>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<{
-    customers?: File;
-    weather?: File;
-    flights?: File;
-  }>({});
+  // const [selectedModelForRetrain, setSelectedModelForRetrain] = useState<Model | null>(null)
   const [modelName, setModelName] = useState<string>("");
   const [uploadedModel, setUploadedModel] = useState<File | null>(null);
-  const [isRetraining, setIsRetraining] = useState(false)
-  const [createNewModelParams, setCreateNewModelParams] = useState<{
-    region_id?: number;
-    customers?: File;
-    weather?: File;
-    flights?: File;
-    dishes?: File;
-    ingredients?: File;
-  }>({ customers: undefined, weather: undefined, flights: undefined, dishes: undefined, ingredients: undefined });
+  // const [isRetraining, setIsRetraining] = useState(false)
+  const [uploadedFileToTraining, setUploadedFileToTraining] = useState<File | null>(null);
 
-  const { regions } = useAppProvider()
+  const { regions, modelTypes } = useAppProvider()
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null)
+  const [selectedModelType, setSelectedModelType] = useState<ModelType | null>(null)
   const { modelsList, setModelsList } = useAppProvider()
 
   const getStatusColor = (status: Model["status"]) => {
@@ -160,17 +71,14 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
     }
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: "customers" | "weather" | "flights" | "dishes" | "ingredients") => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (
       file &&
       (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         file.type === "application/vnd.ms-excel")
     ) {
-      setCreateNewModelParams((prev) => ({
-        ...prev,
-        [type]: file,
-      }));
+      setUploadedFileToTraining(file)
     } else {
       alert("Vui lòng chọn file Excel (.xlsx hoặc .xls)")
     }
@@ -190,9 +98,9 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
     setModelName(safeValue);
   };
   const handleRetrain = async () => {
-    if (!uploadedFiles || !selectedModelForRetrain) return
+    // if (!uploadedFiles || !selectedModelForRetrain) return
 
-    setIsRetraining(true)
+    // setIsRetraining(true)
     // Simulate retrain process
     // setTimeout(() => {
     //   setIsRetraining(false)
@@ -204,32 +112,78 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
   }
 
   const handleCreateNewModel = async () => {
-    if (!createNewModelParams || !selectedRegion) {
-      console.log("Thiếu thông tin để tạo mô hình mới");
+    if (!selectedModelType || !selectedRegion || !uploadedFileToTraining) {
+      alert("Thiếu thông tin để tạo mô hình mới");
       return
     }
-    console.log("Gởi qua back end");
-    // Call API to create new model
+    // Confirm
+    const ok = confirm("Xác nhận huấn luyện mô hình?");
+    if (!ok) return;
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadedFileToTraining)
+      formData.append("model_name", modelName);
+      formData.append("model_type", selectedModelType.type.toString());
+      formData.append("region_id", selectedRegion.id.toString());
+      // Call API to create new model
+      // Gọi API backend
+      const res = await fetch("http://127.0.0.1:8000/models/create", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Fetch api thất bại: ${errorText}`);
+      }
+
+      const data = await res.json();
+
+      if (data.status === "success") {
+        console.log("Upload thành công:", data);
+        alert("Mô hình đã được huấn luyện thành công!");
+
+      }
+      else if (data.status === "training") {
+        console.log("Đang huấn luyện mô hình:", data);
+        setCreateNewModelDialogOpen(false)
+        alert("Mô hình đang được huấn luyện!")
+      }
+      else {
+        console.log("Upload thất bại:", data);
+        alert("Có lỗi xảy ra khi huấn luyện mô hình");
+      }
+
+    } catch (err) {
+      console.error("Lỗi khi huấn luyện mô hình 11:", err);
+      alert("Có lỗi xảy ra khi huấn luyện mô hình");
+    }
   }
 
   const openRetrainDialog = (model: Model) => {
-    setSelectedModelForRetrain(model)
-    setRetrainDialogOpen(true)
+    // setSelectedModelForRetrain(model)
+    // setRetrainDialogOpen(true)
   }
 
   const openCreateNewModelDialog = () => {
     setCreateNewModelDialogOpen(true)
-  }
-
-  const handleCancelExistingModel = () => {
     setModelName("");
     handleSelectedRegion("-1");
+    handleSelectedModelType("-1")
     setUploadedModel(null);
-    setAddExistingDialogOpen(false);
+    setUploadedFileToTraining(null)
+  }
+  const openAddExistingModelDialog = () => {
+    setAddExistingDialogOpen(true)
+    setModelName("");
+    handleSelectedRegion("-1");
+    handleSelectedModelType("-1")
+    setUploadedModel(null);
+    setUploadedFileToTraining(null)
   }
 
   const handleSaveExistingModel = async () => {
-    if (!modelName || !selectedRegion || !uploadedModel) {
+    if (!selectedModelType || !modelName || !selectedRegion || !uploadedModel) {
       alert("Thiếu thông tin để lưu mô hình. Vui lòng điền đầy đủ thông tin trước khi lưu mô hình.");
       console.log("Thiếu thông tin để lưu mô hình có sẵn");
       return;
@@ -238,11 +192,11 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
     const ok = confirm("Xác nhận lưu mô hình?");
     if (!ok) return;
     try {
-
       // Chuẩn bị form data
       const formData = new FormData();
       formData.append("file", uploadedModel);
       formData.append("model_name", modelName);
+      formData.append("model_type", selectedModelType.id.toString());
       formData.append("region_id", selectedRegion.id.toString());
 
       // Gọi API backend
@@ -262,9 +216,10 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       if (data.status === "success") {
         console.log("Upload thành công:", data);
         alert("Mô hình đã được lưu thành công!");
-        setModelName("");
-        handleSelectedRegion("-1");
-        setUploadedModel(null);
+        // setModelName("");
+        // handleSelectedRegion("-1");
+        // handleSelectedModelType("-1")
+        // setUploadedModel(null);
 
       } else {
         console.log("Upload thất bại:", data);
@@ -275,20 +230,19 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       console.error("Lỗi khi lưu mô hình:", err);
       alert("Có lỗi xảy ra khi lưu mô hình");
     }
-    finally {
-      try {
-        // 3. Lấy lại danh sách model mới nhất
-        const { data, error } = await supabase.from("cip_models").select("*");
-        if (error) throw error;
-
-        setModelsList(data || []);
-        setAddExistingDialogOpen(false);
-      }
-      catch (err) {
-        console.error("Error loading models:", err);
-        alert("Có lỗi xảy ra khi tải lại các mô hình.");
-      }
-    }
+    // finally {
+    //   try {
+    //     // 3. Lấy lại danh sách model mới nhất
+    //     const { data, error } = await supabase.from("cip_models").select("*");
+    //     if (error) throw error;
+    //     setModelsList(data || []);
+    //     setAddExistingDialogOpen(false);
+    //   }
+    //   catch (err) {
+    //     console.error("Error loading models:", err);
+    //     alert("Có lỗi xảy ra khi tải lại các mô hình.");
+    //   }
+    // }
   }
 
 
@@ -305,7 +259,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       const res = await fetch("http://127.0.0.1:8000/models/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model_id: model.id, file_path: model.file_path }),
+        body: JSON.stringify({ model_id: model.id, file_path: model.filePath }),
       });
       if (!res.ok) {
         const errorText = await res.text();
@@ -316,9 +270,6 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       if (data.status === "success") {
         console.log("Xóa thành công:", data);
         alert(data.message || "Mô hình đã được xóa thành công!");
-
-
-
       } else {
         console.log("Xóa thất bại:", data);
         alert("Có lỗi xảy ra khi xóa model và file");
@@ -327,19 +278,19 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       console.error("Error deleting model:", err);
       alert("Có lỗi xảy ra khi xóa model.");
     }
-    finally {
-      try {
-        // 3. Lấy lại danh sách model mới nhất
-        const { data, error } = await supabase.from("cip_models").select("*");
-        if (error) throw error;
+    // finally {
+    //   try {
+    //     // 3. Lấy lại danh sách model mới nhất
+    //     const { data, error } = await supabase.from("cip_models").select("*");
+    //     if (error) throw error;
 
-        setModelsList(data || []);
-      }
-      catch (err) {
-        console.error("Error loading models:", err);
-        alert("Có lỗi xảy ra khi tải lại các mô hình.");
-      }
-    }
+    //     setModelsList(data || []);
+    //   }
+    //   catch (err) {
+    //     console.error("Error loading models:", err);
+    //     alert("Có lỗi xảy ra khi tải lại các mô hình.");
+    //   }
+    // }
   }
 
   const handleSelectedRegion = (regionId: string) => {
@@ -347,7 +298,12 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
     setSelectedRegion(region || null)
     // setCreateNewModelParams((prev) => ({ ...prev, region_id: Number.parseInt(regionId) }));
   }
-
+  const handleSelectedModelType = (typeId: string) => {
+    const type = modelTypes.find((t) => t.id === Number.parseInt(typeId))
+    setSelectedModelType(type || null)
+    setUploadedFileToTraining(null)
+    // setCreateNewModelParams((prev) => ({ ...prev, region_id: Number.parseInt(regionId) }));
+  }
   const handleSetUsing = async (model: Model) => {
     if (model.status !== "completed") {
       alert("Chỉ có thể chọn mô hình với trạng thái 'Hoàn thành'")
@@ -361,7 +317,8 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       let { error: error1 } = await supabase
         .from("cip_models")
         .update({ status: "completed" })
-        .eq("region_id", model.region_id);
+        .eq("type", model.type)
+        .eq("region_id", model.regionId);
       if (error1) throw error1;
 
       // 2. Chọn model hiện tại sang 'using'
@@ -372,10 +329,10 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
       if (error2) throw error2;
 
       // 3. Lấy lại danh sách model mới nhất
-      const { data, error } = await supabase.from("cip_models").select("*");
-      if (error) throw error;
+      // const { data, error } = await supabase.from("cip_models").select("*");
+      // if (error) throw error;
 
-      setModelsList(data || []);
+      // setModelsList(data || []);
     } catch (err) {
       console.error("Error updating models:", err);
       alert("Có lỗi xảy ra khi cập nhật model.");
@@ -396,8 +353,13 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
             </Button>
           </div> */}
           <div>
-            <Button variant="outline" onClick={() => setAddExistingDialogOpen(true)}>
+            <Button variant="outline" onClick={openAddExistingModelDialog}>
               Tải mô hình có sẵn
+            </Button>
+          </div>
+          <div>
+            <Button variant="outline" onClick={openCreateNewModelDialog}>
+              Huấn luyện mô hình mới
             </Button>
           </div>
         </div>
@@ -423,14 +385,14 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                     // <Button size="sm" variant="outline" className="hover:cursor-pointer" onClick={() => handleSetUsing(model)}>
                     //   Chọn dùng
                     // </Button>
-                    <Badge className={model.region_id === 1 ? "bg-amber-200 text-foreground" : "bg-emerald-200 text-foreground"} variant="outline">{regions.find(r => r.id === model.region_id)?.name}</Badge>
+                    <Badge className={model.regionId === 1 ? "bg-amber-200 text-foreground" : "bg-emerald-200 text-foreground"} variant="outline">{regions.find(r => r.id === model.regionId)?.name}</Badge>
                   }
                   <Badge className={getStatusColor(model.status)}>{getStatusText(model.status)}</Badge>
                   <Badge variant="outline">v{Number.parseFloat(model.version).toFixed(1)}</Badge>
                 </div>
               </div>
 
-              {/* {model.status === "training" && (
+              {model.status === "training" && (
                 <div className="mb-3">
                   <div className="flex justify-between text-sm mb-1">
                     <span>Tiến độ huấn luyện</span>
@@ -438,13 +400,9 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                   </div>
                   <Progress value={model.trainingProgress} className="h-2" />
                 </div>
-              )} */}
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                {/* <div>
-                  <span className="text-muted-foreground">Độ chính xác:</span>
-                  <p className="font-medium">{model.accuracy > 0 ? `${model.accuracy}%` : "Chưa có"}</p>
-                </div> */}
                 {/* <div>
                   <span className="text-muted-foreground">Thời gian:</span>
                   <p className="font-medium">{model.trainingTime}</p>
@@ -455,8 +413,12 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                 </div> */}
                 <div>
                   <span className="text-muted-foreground">Ngày tạo:</span>
-                  <p className="font-medium">{formatTimestampVN(model.created_at)}</p>
+                  <p className="font-medium">{formatTimestampVN(model.createdAt)}</p>
                   {/* <p className="font-medium"> {new Date(model.created_at).toLocaleTimeString("vi-VN")}</p> */}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Độ chính xác:</span>
+                  <p className="font-medium">{model.accuracy?.toFixed(0)}%</p>
                 </div>
               </div>
 
@@ -492,10 +454,10 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                     Chọn dùng
                   </Button>
                 }
-                <Button size="sm" variant="outline">
+                {/* <Button size="sm" variant="outline">
                   <Eye className="h-3 w-3 mr-1" />
                   Chi tiết
-                </Button>
+                </Button> */}
                 <Button size="sm" variant="outline" className="text-destructive hover:text-destructive bg-transparent" onClick={() => handleDeleteModel(model)}>
                   <Trash2 className="h-3 w-3 mr-1" />
                   Xóa
@@ -507,7 +469,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
 
 
         {/* Retrain dialog */}
-        <Dialog open={retrainDialogOpen} onOpenChange={setRetrainDialogOpen}>
+        {/* <Dialog open={retrainDialogOpen} onOpenChange={setRetrainDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Update Model</DialogTitle>
@@ -516,7 +478,6 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {/* File flights */}
               <div className="space-y-2">
                 <Label htmlFor="excel-file-flights">Chọn file Excel dữ liệu chuyến bay <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
@@ -524,7 +485,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                     id="excel-file-flights"
                     type="file"
                     accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "flights")}
+                    onChange={(event) => handleFileUpload(event, FileType.Flights)}
                     className="cursor-pointer"
                   />
                   <Upload className="h-4 w-4 text-muted-foreground" />
@@ -537,7 +498,6 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                   </div>
                 )}
               </div>
-              {/* File lounge usage */}
               <div className="space-y-2">
                 <Label htmlFor="excel-file-customers">Chọn file Excel dữ liệu hành khách sử dụng phòng chờ <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
@@ -545,7 +505,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                     id="excel-file-customers"
                     type="file"
                     accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "customers")}
+                    onChange={(event) => handleFileUpload(event, FileType.Customers)}
                     className="cursor-pointer"
                   />
                   <Upload className="h-4 w-4 text-muted-foreground" />
@@ -558,7 +518,6 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                   </div>
                 )}
               </div>
-              {/* File weather */}
               <div className="space-y-2">
                 <Label htmlFor="excel-file-weather">Chọn file Excel dữ liệu thời tiết <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
@@ -566,7 +525,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                     id="excel-file-weather"
                     type="file"
                     accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "weather")}
+                    onChange={(event) => handleFileUpload(event, FileType.Weather)}
                     className="cursor-pointer"
                   />
                   <Upload className="h-4 w-4 text-muted-foreground" />
@@ -599,10 +558,10 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
               </div>
             </div>
           </DialogContent>
-        </Dialog>
+        </Dialog> */}
 
         {/* Create new model */}
-        {/* <Dialog open={createNewModelDialogOpen} onOpenChange={setCreateNewModelDialogOpen}>
+        <Dialog open={createNewModelDialogOpen} onOpenChange={() => setCreateNewModelDialogOpen(false)}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Huấn luyện mô hình mới</DialogTitle>
@@ -611,153 +570,123 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-
-              <Label htmlFor="model-type" className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Chọn khu vực <span className="text-red-500">*</span>
-              </Label>
-              <Select value={selectedRegion?.id.toString()} onValueChange={handleSelectedRegion}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn khu vực" />
-                </SelectTrigger>
-                <SelectContent id="model-type">
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id.toString()}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+              {/* Loại mô hình */}
               <div className="space-y-2">
-                <Label htmlFor="excel-file-flights">Chọn file Excel dữ liệu chuyến bay <span className="text-red-500">*</span></Label>
+                <Label htmlFor="model-name">Loại mô hình<span className="text-red-500">*</span></Label>
+                <Select value={selectedModelType?.id.toString()} onValueChange={handleSelectedModelType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại mô hình" />
+                  </SelectTrigger>
+                  <SelectContent id="model-type">
+                    {modelTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="model-type" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Chọn khu vực <span className="text-red-500">*</span>
+                </Label>
+                <Select value={selectedRegion?.id.toString()} onValueChange={handleSelectedRegion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn khu vực" />
+                  </SelectTrigger>
+                  <SelectContent id="model-type">
+                    {regions.map((region) => (
+                      <SelectItem key={region.id} value={region.id.toString()}>
+                        {region.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="model-name">Tên mô hình<span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    id="excel-file-flights"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "flights")}
-                    className="cursor-pointer"
+                    id="model-name"
+                    type="text"
+                    value={modelName}
+                    onChange={(event) => handleTextChange(event)}
+                    // className="cursor-pointer"
+                    placeholder="Nhập tên mô hình (không dâu tiếng Việt)"
                   />
-                  <Upload className="h-4 w-4 text-muted-foreground" />
                 </div>
-                {uploadedFiles.flights && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>{uploadedFiles.flights.name}</span>
-                    <span>({(uploadedFiles.flights.size / 1024 / 1024).toFixed(2)} MB)</span>
-                  </div>
-                )}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="excel-file-weather">Chọn file Excel dữ liệu thời tiết <span className="text-red-500">*</span></Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="excel-file-weather"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "weather")}
-                    className="cursor-pointer"
-                  />
-                  <Upload className="h-4 w-4 text-muted-foreground" />
+              {selectedModelType?.type == "customer" &&
+                <div className="space-y-2">
+                  <Label htmlFor="customers">Chọn file Excel Hành khách sử dụng phòng chờ<span className="text-red-500">*</span></Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="customers"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(event) => handleFileUpload(event)}
+                      className="cursor-pointer"
+                    />
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
-                {uploadedFiles.weather && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>{uploadedFiles.weather.name}</span>
-                    <span>({(uploadedFiles.weather.size / 1024 / 1024).toFixed(2)} MB)</span>
+              }
+              {selectedModelType?.type == "food" &&
+                <div className="space-y-2">
+                  <Label htmlFor="log-refill">Chọn file Excel Nhật ký bổ sung món ăn <span className="text-red-500">*</span></Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="log-refill"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(event) => handleFileUpload(event)}
+                      className="cursor-pointer"
+                    />
+                    <Upload className="h-4 w-4 text-muted-foreground" />
                   </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="excel-file-customers">Chọn file Excel dữ liệu hành khách sử dụng phòng chờ <span className="text-red-500">*</span></Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="excel-file-customers"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "customers")}
-                    className="cursor-pointer"
-                  />
-                  <Upload className="h-4 w-4 text-muted-foreground" />
                 </div>
-                {uploadedFiles.customers && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>{uploadedFiles.customers.name}</span>
-                    <span>({(uploadedFiles.customers.size / 1024 / 1024).toFixed(2)} MB)</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="excel-file-dishes">Chọn file Excel dữ liệu món ăn <span className="text-red-500">*</span></Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="excel-file-dishes"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "dishes")}
-                    className="cursor-pointer"
-                  />
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                </div>
-                {uploadedFiles.weather && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>{uploadedFiles.weather.name}</span>
-                    <span>({(uploadedFiles.weather.size / 1024 / 1024).toFixed(2)} MB)</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="excel-file-ingredients">Chọn file Excel dữ liệu nguyên liệu <span className="text-red-500">*</span></Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="excel-file-ingredients"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => handleFileUpload(event, "ingredients")}
-                    className="cursor-pointer"
-                  />
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                </div>
-                {uploadedFiles.weather && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>{uploadedFiles.weather.name}</span>
-                    <span>({(uploadedFiles.weather.size / 1024 / 1024).toFixed(2)} MB)</span>
-                  </div>
-                )}
-              </div>
-
+              }
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setCreateNewModelDialogOpen(false)}>
                   Hủy
                 </Button>
-                <Button onClick={handleCreateNewModel} disabled={!createNewModelParams}>
+                <Button onClick={handleCreateNewModel} >
                   Bắt đầu Train mô hình
                 </Button>
               </div>
             </div>
           </DialogContent>
-        </Dialog> */}
+        </Dialog>
 
         {/* Add existing dialog */}
-        <Dialog open={addExistingDialogOpen} onOpenChange={setAddExistingDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+        <Dialog open={addExistingDialogOpen} onOpenChange={() => setAddExistingDialogOpen(false)}>
+          <DialogContent className="sm:max-w-md select-none">
             <DialogHeader>
               <DialogTitle>Thêm mô hình có sẵn</DialogTitle>
-              {/* <DialogDescription>
-                Upload file model "{selectedModelForRetrain?.name}"
-              </DialogDescription> */}
             </DialogHeader>
             <div className="space-y-4">
-              {/* Tên mô hình */}
+              {/* Loại mô hình */}
+              <div className="space-y-2">
+                <Label htmlFor="model-name">Loại mô hình<span className="text-red-500">*</span></Label>
+                {/* <CardDescription className="flex items-center gap-1">
+                  <InfoIcon size={14}></InfoIcon>
+                  <p>Mô hình dự đoán về</p>
+                </CardDescription> */}
+                <Select value={selectedModelType?.id.toString()} onValueChange={handleSelectedModelType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại mô hình" />
+                  </SelectTrigger>
+                  <SelectContent id="model-type">
+                    {modelTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="model-name">Tên mô hình<span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
@@ -817,7 +746,7 @@ export function ModelList({ onSelectModel, selectedModel }: ModelListProps) {
                 )}
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCancelExistingModel}>
+                <Button variant="outline" onClick={() => setAddExistingDialogOpen(false)}>
                   Hủy
                 </Button>
                 <Button onClick={handleSaveExistingModel}>

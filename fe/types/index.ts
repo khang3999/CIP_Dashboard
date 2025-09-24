@@ -3,25 +3,31 @@ export interface Model {
     id: string
     name: string
     type: string
-    region_id: number
+    regionId: number
     status: "training" | "completed" | "failed" | "paused" | "using" | "default"
     accuracy?: number
-    file_path: string
-    file_url: string
+    filePath: string
+    fileUrl: string
     rmse?: number
     mae?: number
     r2?: number
     wape?: number
-    training_progress: number
-    created_at: string
-    training_time?: string
-    data_size?: string
+    trainingProgress: number
+    createdAt: string
+    trainingTime?: string
+    dataSize?: string
     version: string
 }
 // Types for shared data
 export interface Region {
     id: number
     name: string
+}
+
+export interface ModelType {
+    id: number
+    label: string
+    type: string
 }
 
 export interface OveriewParams {

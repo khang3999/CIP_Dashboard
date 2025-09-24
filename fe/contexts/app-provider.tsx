@@ -1,6 +1,6 @@
 "use client"
 
-import { FoodDistribution, IngredientDistribution, LoungageUsage, OveriewParams, Region, Timeslot, Store, Model } from "@/types"
+import { FoodDistribution, IngredientDistribution, LoungageUsage, OveriewParams, Region, Timeslot, Store, Model, ModelType } from "@/types"
 import { supabase } from "@/utils/supabase/client"
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { DateRange } from "react-day-picker"
@@ -11,6 +11,7 @@ interface AppContextType {
   regions: Region[]
   stores: Store[]
   timeslots: Timeslot[]
+  modelTypes: ModelType[]
   // selectedRegion: Region | null
   // selectedStore: Store | null
   // setSelectedRegion: (region: Region | null) => void
@@ -41,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [regions, setRegions] = useState<Region[]>([])
   const [stores, setStores] = useState<Store[]>([])
   const [timeslots, setTimeslots] = useState<Timeslot[]>([])
+  const [modelTypes, setModelTypes] = useState<ModelType[]>([])
   const [loungeUsage, setLoungeUsage] = useState<LoungageUsage[]>([])
   const [foodDistribution, setFoodDistribution] = useState<FoodDistribution[]>([])
   const [ingredientDistribution, setIngredientDistribution] = useState<IngredientDistribution[]>([])
@@ -58,8 +60,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let regionsData: Region[] = []
       let storesData: Store[] = []
       let shiftsData: Timeslot[] = []
-
+      let modelTypes: any[] = []
       try {
+        //     id: string
+        // name: string
+        // type: string
+        // regionId: number
+        // status: "training" | "completed" | "failed" | "paused" | "using" | "default"
+        // accuracy?: number
+        // file_path: string
+        // file_url: string
+        // rmse?: number
+        // mae?: number
+        // r2?: number
+        // wape?: number
+        // trainingProgress: number
+        // created_at: string
+        // training_time?: string
+        // data_size?: string
+        // version: string
         const { data, error } = await supabase.from("cip_regions").select("*")
         if (error) throw error
         regionsData = data ?? []
@@ -87,9 +106,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error("Error fetching stores:", err)
       }
 
+      try {
+        const { data, error } = await supabase.from("cip_model_types").select("*")
+        if (error) throw error
+        modelTypes = data ?? []
+        // console.log(regionsData);
+
+      } catch (err) {
+        console.error("Error fetching regions:", err)
+      }
+
       setRegions(regionsData)
       setStores(storesData)
       setTimeslots(shiftsData)
+      setModelTypes(modelTypes)
     }
 
     fetchRegionsAndStoresAndShifts()
@@ -98,16 +128,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const { data, error } = await supabase.from("cip_models").select("*")
+        const { data, error } = await supabase.from("cip_models").select("id, name, type, regionId:region_id, status, accuracy, filePath:file_path, fileUrl:file_url, rmse, mae, wape, trainingProgress:training_progress, createdAt:created_at, version").order("created_at")
         if (error) throw error
         setModelsList(data || [])
       } catch (err) {
         console.error("Error fetching models:", err)
       }
     }
-
+    // Fetch lần đầu
     fetchModels()
-  }, [])
+    const channel = supabase
+      .channel("models-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cip_models" },
+        (payload) => {
+          // console.log("Realtime change:", payload);
+          // if (payload.eventType === "UPDATE") {
+          //   // const updated = payload.new;
+          //   // // ví dụ cập nhật UI khi model completed
+          //   // if (updated.status === "completed") {
+          //   //   alert(`✅ Model ${updated.model_name} đã train xong!`);
+          //   // }
+          // }
+          console.log("Realtime change detected:", payload);
+          fetchModels()
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const refreshData = () => {
     setIsLoading(true)
@@ -130,8 +183,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsLoading,
     refreshData,
     getStoresForRegion,
-    modelsList, 
-    setModelsList
+    modelsList,
+    setModelsList,
+    modelTypes
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
