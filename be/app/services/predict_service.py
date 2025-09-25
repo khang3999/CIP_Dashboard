@@ -110,6 +110,8 @@ class PredictService:
             f.write(idata_trace_bytes)
         # Đọc file bằng az sẽ chuyển thành InferenceData
         idata_trace = az.from_netcdf(file_path)
+        
+        # os.remove(file_path)
 
         print(idata_trace.groups(), "idata")
 
@@ -137,6 +139,7 @@ class PredictService:
                     )
                 # Tạo dict để tra nhanh
                 dishes_dict = {d["id"]: d["name"] for d in res_dishes.data}
+                food_types_dict = {d["id"]: d["food_type"] for d in res_dishes.data}
                 for item_id, info in allocation.items():
                     result_foods.append(
                         {
@@ -146,6 +149,7 @@ class PredictService:
                             "pax": row["total_customers"],
                             "dish_id": item_id,
                             "dish_name": dishes_dict.get(item_id, "Unknown"),
+                            "food_type":food_types_dict.get(item_id,"Unknown"),
                             "consumed_amount_suat": info["forecast"],
                             "mu": info["mu"],
                             "hdi80_low": info["hdi80"][0],
@@ -783,7 +787,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
                     "lead_time": lead,
                     "order_placed": order_placed,
                     "order_qty": order_qty,
-                    # "expected_receipt_date": exp_rcv_date,
+                    "expected_receipt_date": exp_rcv_date,
                 }
             )
 

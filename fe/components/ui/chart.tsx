@@ -275,8 +275,8 @@ function ChartLegendContent({
       //   className
       // )}
       className={cn(
-        "grid gap-2 w-full",                   // 👉 đổi flex thành grid
-        "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4", // 👉 số cột responsive
+        "grid gap-2 w-full",
+        "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
         verticalAlign === "top" ? "pb-3" : "pt-3",
         className
       )}

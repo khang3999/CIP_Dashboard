@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label, Legend, ComposedChart } from "recharts"
+import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label, Legend, ComposedChart, LabelList } from "recharts"
 import { useLoungeUsage, useFoodDistribution, useIngredientDistribution } from "@/contexts/app-provider"
 import { useCallback, useEffect, useRef, useState } from "react"
 // import { CustomParams } from "./prediction-controls"
@@ -12,7 +12,7 @@ import { generateTicks, getDateRangeOfPast, getRandomColor } from "@/utils/utils
 import { supabase } from "@/utils/supabase/client"
 import { useOverviewProvider } from "@/contexts/overview-context"
 
-const COLORS = ["#059669", "#0891b2", "#7c3aed", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#2563eb"]
+export const COLORS = ["#059669", "#0891b2", "#7c3aed", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#2563eb"]
 export function PassengerShiftChart({ params }: { params?: OveriewParams | null }) {
   const [loungeUsageData, setLoungeUsageData] = useState<LoungageUsage[]>([])
 
@@ -135,7 +135,7 @@ export function PassengerShiftChart({ params }: { params?: OveriewParams | null 
                 >
                   <Label value={params?.presetRange?.time_status === 'today' ? "Tháng" : "Ngày"} position="insideBottomRight" dx={5} dy={5} />
                 </XAxis>
-                <YAxis 
+                <YAxis
                   padding={{ top: 10 }}
                 >
                   <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
@@ -143,7 +143,13 @@ export function PassengerShiftChart({ params }: { params?: OveriewParams | null 
                 {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
                 <ChartTooltip content={<ChartTooltipContent />} />
                 {/* <Legend content={<ChartLegendContent />} /> */}
-                <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} >
+                  {/* <LabelList dataKey="total_customers" position="top" content={({ x, y, value }) => (
+                    <text x={x} y={typeof y === "number" ? y - 5 : 0} fill="#000" fontSize={12} textAnchor="middle">
+                      {value}
+                    </text>
+                  )} /> */}
+                </Line>
               </LineChart>
               :
               <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>

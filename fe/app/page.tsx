@@ -19,7 +19,7 @@ import OverviewProvider, { useOverviewProvider } from "@/contexts/overview-conte
 import PredictionProvider, { usePredictionProvider } from "@/contexts/prediction-context"
 import { formatDate, generateTicks, getDateRangeOfFuture } from "@/utils/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label } from "recharts"
+import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label, LabelList } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import DailyChart from "@/components/daily-chart"
 
@@ -31,7 +31,7 @@ function OverviewSection() {
     <div className="space-y-6">
       <SimpleSelector />
       <div>
-        <PassengerShiftChart params={params}/>
+        <PassengerShiftChart params={params} />
       </div>
       <div>
         <FoodDistributionChart params={params} />
@@ -167,7 +167,9 @@ function PredictionsSection() {
                           </YAxis>
                           {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
                           <ChartTooltip content={<ChartTooltipContent />} />
-                          <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} >
+                            <LabelList dataKey="total_customers" position="top" />
+                          </Line>
                         </LineChart>
                         :
                         <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>

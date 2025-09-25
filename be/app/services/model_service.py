@@ -236,13 +236,13 @@ class ModelService:
         n_timeslots = len(timeslot_codes)
 
         # 3.4 Tạo store_idx
-        store_sorted = sorted(df_train["store_id"].unique().tolist())
-        # store_sorted_res = (
-        #     self.supabase.table("cip_stores").select("id").order("id").execute()
-        # )
-        # if not store_sorted_res.data or len(store_sorted_res.data) == 0:
-        #     raise ValueError(f"No data found")
-        # store_sorted = [row["id"] for row in store_sorted_res.data]
+        # store_sorted = sorted(df_train["store_id"].unique().tolist())
+        store_sorted_res = (
+            self.supabase.table("cip_stores").select("id").order("id").execute()
+        )
+        if not store_sorted_res.data or len(store_sorted_res.data) == 0:
+            raise ValueError(f"No data found")
+        store_sorted = [row["id"] for row in store_sorted_res.data]
 
         store_codes = {store_id: index for index, store_id in enumerate(store_sorted)}
         # Gán lại idx
@@ -356,14 +356,15 @@ class ModelService:
             mu_interaction = pm.Deterministic(
                 "mu_interaction", pm.math.exp(log_interaction)
             )
-
+            mu_obs = mu_interaction[dish_idx_obs, timeslot_idx_obs, store_idx_obs]
             # === Dispersion ===
             # Trong Hier Gamma kappa là phân phối các món trong menu: lớn thì các món được gọi đều, nhỏ thì có món gọi nhiều có món ít
             kappa = pm.HalfNormal("kappa", sigma=1.0)
             # Likelihood (Gamma) có trọng số theo PAX:
             # # E[CR] = mu_item[item_idx], Var = mu^2 / kappa  => rate = kappa / mu
             # Trong Hier Gamma beta = rate_vec là mức trung bình khách ăn tổng cộng bao nhiêu: lớn thì khách ăn ít, nhỏ ăn nhiều
-            rate_vec = kappa / mu_interaction  # <-- ĐÃ định nghĩa rate_vec
+            # rate_vec = kappa / mu_interaction  # <-- ĐÃ định nghĩa rate_vec
+            rate_vec = kappa / mu_obs  # <-- ĐÃ định nghĩa rate_vec
             # Random variable Gamma theo từng quan sát
             rv = pm.Gamma.dist(alpha=kappa, beta=rate_vec)
             # Log-likelihood vector cho dữ liệu quan sát (PyMC 4 API)
