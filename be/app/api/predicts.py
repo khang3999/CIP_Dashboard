@@ -35,27 +35,66 @@ async def create_predict(body: dict = Body(...)):
         or end_date is None
     ):
         raise HTTPException(status_code=400, detail="Missing required fields")
-    print(region_id, store_id, timeslot_id, start_date, end_date)
-    result_customers, result_foods, result_ingredients = predict_service.predict(
-        start_date=start_date,
-        end_date=end_date,
-        region_id=region_id,
-        timeslot_id=timeslot_id,
-        store_id=store_id,
+    ##### Gọi service
+    result_customers, grouped_dishes_by_date, result_ingredients = (
+        predict_service.predict_1(
+            start_date=start_date,
+            end_date=end_date,
+            region_id=region_id,
+            timeslot_id=timeslot_id,
+            store_id=store_id,
+        )
     )
     return {
         "status": "Success",
         "data": {
             "result_customers": result_customers,
-            "result_foods": result_foods,
+            "result_foods": grouped_dishes_by_date,
             "result_ingredients": result_ingredients,
         },
+        # "type": "day",
     }
+    # if timeslot_id == 4:
+    #     result_customers, result_foods, result_ingredients = (
+    #         predict_service.predict_1(
+    #             start_date=start_date,
+    #             end_date=end_date,
+    #             region_id=region_id,
+    #             timeslot_id=timeslot_id,
+    #             store_id=store_id,
+    #         )
+    #     )
+    #     return {
+    #         "status": "Success",
+    #         "data": {
+    #             "result_customers": result_customers,
+    #             "result_foods": result_foods,
+    #             "result_ingredients": result_ingredients,
+    #         },
+    #         "type": "day",
+    #     }
+    # else:
+    #     result_customers, result_foods, result_ingredients = predict_service.predict(
+    #         start_date=start_date,
+    #         end_date=end_date,
+    #         region_id=region_id,
+    #         timeslot_id=timeslot_id,
+    #         store_id=store_id,
+    #     )
+    #     return {
+    #         "status": "Success",
+    #         "data": {
+    #             "result_customers": [result_customers],
+    #             "result_foods": [result_foods],
+    #             "result_ingredients": [result_ingredients],
+    #         },
+    #         "type": "timeslot",
+    #     }
 
 
 @router.get("/weather")
 def get_weather_by_api():
     result = weather_service.get_weather_from_api()
-    print(result)
+    # print(result)
     safe_result = jsonable_encoder(result)
     return safe_result

@@ -110,10 +110,10 @@ class PredictService:
             f.write(idata_trace_bytes)
         # Đọc file bằng az sẽ chuyển thành InferenceData
         idata_trace = az.from_netcdf(file_path)
-        
+
         # os.remove(file_path)
 
-        print(idata_trace.groups(), "idata")
+        # print(idata_trace.groups(), "idata")
 
         result_foods = []
         result_ingredients = []
@@ -149,7 +149,7 @@ class PredictService:
                             "pax": row["total_customers"],
                             "dish_id": item_id,
                             "dish_name": dishes_dict.get(item_id, "Unknown"),
-                            "food_type":food_types_dict.get(item_id,"Unknown"),
+                            "food_type": food_types_dict.get(item_id, "Unknown"),
                             "consumed_amount_suat": info["forecast"],
                             "mu": info["mu"],
                             "hdi80_low": info["hdi80"][0],
@@ -176,6 +176,218 @@ class PredictService:
         result_ingredients = group_items_by_date(result_ingredients, today)
 
         return result_customers, result_foods, result_ingredients
+
+    def predict_1(
+        self,
+        start_date: str,
+        end_date: str,
+        region_id: int,
+        timeslot_id: int,
+        store_id: int,
+    ):
+        today = date.today()
+        if timeslot_id == 4:
+            res_timeslots = (
+                self.supabase.table("cip_timeslot").select("id").neq("id", 4).execute()
+            )
+            timeslot_ids = [row["id"] for row in res_timeslots.data]
+        else:
+            timeslot_ids = [timeslot_id]
+        forecasted_customers_list = []  # List chứa kết quả dự đoán khách đến phòng chờ trong 3 ca 1 ngày
+        result_dishes_list = []
+        # result_ingredients_list = []
+        for ts_id in timeslot_ids:
+            latest_data = self._get_customer_statistics_latest(
+                region_id=region_id,
+                timeslot_id=ts_id,
+                store_id=store_id,
+            )
+            # Chuyển thành df
+            df_feat_latest = pd.DataFrame(latest_data.data)
+            # print(start_date, "ppppppppppppppp")
+            # 2.1. Lấy weather mới kiểu dataframe
+            df_weather_furute = weather_service.get_weather_from_api()
+            # 2.2. Lấy weather đến ngày cuối trong
+            last_day = pd.to_datetime(df_feat_latest["date"]).max().date()
+            yesterday = (pd.to_datetime(start_date) - pd.Timedelta(days=2)).date()
+            url_past = f"https://archive-api.open-meteo.com/v1/archive?latitude=10.8188&longitude=106.6519&start_date={last_day}&end_date={yesterday}&hourly=temperature_2m,rain"
+            df_weather_past = weather_service.get_weather_from_api(url=url_past)
+            df_weather = pd.concat(
+                [df_weather_past, df_weather_furute], ignore_index=True
+            )
+            ## CHECK Nan
+            df_weather = fill_nan_weather(df_weather)
+
+            # 3. Lấy dữ liệu chuyến bay kiểu object
+            flights = self._get_flights_data(region_id, ts_id)
+            # Chuyển thành df
+            df_flights = pd.DataFrame(flights.data)
+            # print(df_flights.columns,"tytyty1")
+            # 4. Lấy model
+            model_customer = self._get_model_customer(region_id)
+            # Dự báo tất cả ngày của 1 ca
+            result_customers_by_timeslot = _forecast_customers(
+                start_date=start_date,
+                end_date=end_date,
+                df_feat_latest=df_feat_latest,
+                df_flights=df_flights,
+                df_weather=df_weather,
+                model=model_customer,
+                lags=[1, 7, 14, 28],
+                roll_windows=[3, 7, 14, 28],
+            )
+            # Rải vào mảng: 1 dòng là của 1 ngày 1 ca cụ thể
+            # result_customers_list.append(result_customers_by_timeslot)
+            forecasted_customers_list.extend(result_customers_by_timeslot)
+
+        ### LOAD MODEL
+        model_food_res = (
+            self.supabase.table("cip_models")
+            .select("file_path")
+            .eq("region_id", region_id)
+            .eq("type", "food")
+            .eq("status", "using")
+            .execute()
+        )
+        if not model_food_res.data or len(model_food_res.data) == 0:
+            raise ValueError(f"No model entry found for region {region_id}")
+
+        idata_trace_path = model_food_res.data[0]["file_path"]
+        # trace_path = "trace_model_qn.nc"
+        idata_trace_bytes = self.supabase.storage.from_(BUCKET_NAME).download(
+            idata_trace_path
+        )
+        # Ghi ra file trên máy
+        file_name = "idata_trace_bytes_to_database.nc"
+        # Tạo đường dẫn đầy đủ
+        file_path = os.path.join(CUSTOM_TMP_DIR, file_name)
+        # Ghi file byte lấy từ supabase thành file
+        with open(file_path, "wb") as f:
+            f.write(idata_trace_bytes)
+        # Đọc file bằng az sẽ chuyển thành InferenceData
+        idata_trace = az.from_netcdf(file_path)
+        # MAPPING
+        # Unpack mappings
+        mappings = json.loads(idata_trace.attrs["mappings"])
+        dish_codes = mappings["dish_codes"]
+
+        food_type_codes = mappings["food_type_codes"]
+        food_type_codes = {str(k): v for k, v in food_type_codes.items()}
+
+        timeslot_codes = mappings["timeslot_codes"]
+        timeslot_codes = {int(k): v for k, v in timeslot_codes.items()}
+
+        store_codes = mappings["store_codes"]
+        store_codes = {int(k): v for k, v in store_codes.items()}
+
+        res_dishes = self.supabase.from_("cip_dishes").select("*").execute()
+        if not res_dishes.data or len(res_dishes.data) == 0:
+            raise ValueError("Không có dữ liệu hoặc có lỗi khi truy vấn cip_dishes")
+            # Tạo dict để tra nhanh
+        dishes_dict = {d["id"]: d["name"] for d in res_dishes.data}
+        food_types_dict = {d["id"]: d["food_type"] for d in res_dishes.data}
+
+        #### TOI DAY ROIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+        if store_id == 4:
+            ### TÍNH FOOD
+            # for index, result_customers in enumerate(result_customers_list):
+            result_foods_by_timeslot = []
+            # Dạng group theo ngày -> timeslot -> list dish
+            grouped_dishes_by_date = defaultdict(list)
+            for row in forecasted_customers_list:
+                timeslot_id = row["timeslot_id"]
+                row_date = row["date"]
+                # Danh sách món dự đoán được theo từng ca từng ngày
+                forecasted_dishes = forecast_dishes(
+                    idata_trace=idata_trace,
+                    dish_codes=dish_codes,
+                    food_type_codes=food_type_codes,
+                    timeslot_codes=timeslot_codes,
+                    store_codes=store_codes,
+                    pax=row["total_customers"],
+                    store_id=store_id,
+                    timeslot_id=timeslot_id,
+                    date=row_date,
+                )
+
+                # Lưu kết quả theo từng món của tất cả ca của 1 ngày
+                for item_id, info in forecasted_dishes.items():
+                    # result_foods_by_timeslot.append(
+                    dish_info_by_date_timeslot = {
+                        "date": row_date,
+                        "store_id": store_id,
+                        "timeslot_id": timeslot_id,
+                        "pax": row["total_customers"],
+                        "dish_id": item_id,
+                        "dish_name": dishes_dict.get(item_id, "Unknown"),
+                        "food_type": food_types_dict.get(item_id, "Unknown"),
+                        "consumed_amount_suat": info["forecast"],
+                        "mu": info["mu"],
+                        "hdi80_low": info["hdi80"][0],
+                        "hdi80_high": info["hdi80"][1],
+                        "hdi95_low": info["hdi95"][0],
+                        "hdi95_high": info["hdi95"][1],
+                    }
+                    result_dishes_list.append(dish_info_by_date_timeslot)
+                    # Chỉ group nếu ngày >= hôm nay
+                    if row_date.date() > today:
+                        grouped_dishes_by_date[row_date.strftime("%Y-%m-%d")].append(
+                            dish_info_by_date_timeslot
+                        )
+
+            # Convert defaultdict về dict chuẩn
+            grouped_dishes_by_date = [
+                {"date": d, "dishes": dishes_data}
+                for d, dishes_data in grouped_dishes_by_date.items()
+            ]
+
+            ### Tính nguyên liệu
+            ### Dự báo Ingredient usage, rop
+            list_all_results = []
+            for ts_id in timeslot_ids:
+                timeslot_id = ts_id
+                # result_foods_by_timeslot = result_dishes_list.timeslot
+                result_foods_by_timeslot = [
+                    item
+                    for item in result_dishes_list
+                    if item["timeslot_id"] == timeslot_id
+                ]
+                df_inventory_level = forecast_ingredient(
+                    self.supabase,
+                    store_id,
+                    timeslot_id,
+                    result_foods_by_timeslot,
+                )
+                # Đã drop ngày nhỏ hơn trong hàm forecast_ingredient
+                list_all_results.append(df_inventory_level)
+
+            df_all_ingredients = pd.concat(list_all_results, ignore_index=True)
+            df_all_ingredients = (
+                df_all_ingredients.groupby(
+                    ["date", "ingredient_id"], as_index=False
+                ).agg(
+                    {
+                        "qty_on_hand": "sum",
+                        "qty_received": "sum",
+                        "qty_is_used": "sum",
+                        "ending_inventory": "sum",
+                        "ROP": "sum",
+                        "order_up_to_level": "sum",
+                        "order_placed": "all",
+                        "order_qty": "sum",
+                        "ingredient_name": "first",
+                        "category": "first",
+                        "expected_receipt_date":"last"
+                    }
+                )  # hoặc nhiều cột khác tuỳ bạn
+            )
+            result_ingredients_list = df_all_ingredients.to_dict(orient="records")
+            result_ingredients = group_ingredients_by_date(result_ingredients_list)
+
+        # Xử lí data cho frontend
+        result_customers = filter_customers(forecasted_customers_list)
+
+        return result_customers, grouped_dishes_by_date, result_ingredients
 
     # postgre func name: get_customer_statistics_latest
     def _get_customer_statistics_latest(
@@ -217,17 +429,17 @@ class PredictService:
             raise ValueError(f"No model entry found for region {region_id}")
 
         file_path = res.data[0]["file_path"].strip()
-        print(file_path, "iiiiii")
+        # print(file_path, "iiiiii")
         files = self.supabase.storage.from_(BUCKET_NAME).list()
-        print("Files in bucket:", [f["name"] for f in files])
+        # print("Files in bucket:", [f["name"] for f in files])
         storage_res = self.supabase.storage.from_(BUCKET_NAME).download(file_path)
-        print(type(storage_res), "type")
+        # print(type(storage_res), "type")
         if not storage_res:
             raise ValueError(f"Model file not found at {file_path}")
 
             # Load model từ bytes
         model = joblib.load(BytesIO(storage_res))
-        print("Loaded object type:", type(model))
+        # print("Loaded object type:", type(model))
         return model
         # return
 
@@ -250,7 +462,7 @@ def _forecast_customers(
     # forecast_start_date = pd.to_datetime(forecast_start_date).tz_localize(None)
     # end = pd.to_datetime(end).tz_localize(None)
     end_date = normalize_datetime(end_date)
-    print(forecast_start_date, "----", end_date)
+    # print(forecast_start_date, "----", end_date)
     # Range forecast date
     forecast_dates = pd.date_range(start=forecast_start_date, end=end_date)
 
@@ -278,6 +490,7 @@ def _forecast_customers(
         holiday = 0
 
         timeslot = df_feat_latest["timeslot"].iloc[0]
+        timeslot_id = df_feat_latest["timeslot_id"].iloc[0]
         shift_sin = np.sin(2 * np.pi * timeslot / 24)
         shift_cos = np.cos(2 * np.pi * timeslot / 24)
         # Lấy rain và temp_avg
@@ -302,6 +515,7 @@ def _forecast_customers(
         new_rows = {
             "date": date,
             "store_name": df_feat_latest["store_name"].iloc[0],
+            "timeslot_id": timeslot_id,
             "timeslot": timeslot,
             "flights": flights,
             "temp_avg": temp_avg,
@@ -358,8 +572,8 @@ def _forecast_customers(
                 df_feat_latest["total_customers"].iloc[-(w + 1) : -1].std()
             )
 
-        print(df_new_row.columns, "new_row")
-        print(df_feat_latest.index[-1], "new_row1")
+        # print(df_new_row.columns, "new_row")
+        # print(df_feat_latest.index[-1], "new_row1")
         # mask = (df_feat_latest["date"] == date) & (
         #     df_feat_latest["store_name"] == store
         # )
@@ -434,31 +648,42 @@ def normalize_datetime(dt):
     return dt
 
 
-def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.95]):
+def forecast_dishes(
+    idata_trace,
+    dish_codes,
+    food_type_codes,
+    timeslot_codes,
+    store_codes,
+    pax,
+    store_id,
+    timeslot_id,
+    date,
+    hdi_probs=[0.8, 0.95],
+):
     """
     Returns:
         dict: {Item_ID: {"forecast": int, "mu": float, "hdi80": (low, high), "hdi95": (low, high)}}
     """
-    # Unpack mappings
-    mappings = json.loads(idata_trace.attrs["mappings"])
-    dish_codes = mappings["dish_codes"]
+    # # Unpack mappings
+    # mappings = json.loads(idata_trace.attrs["mappings"])
+    # dish_codes = mappings["dish_codes"]
 
-    # food_type_codes = mappings["food_type_codes"]
-    # food_type_codes = {int(k): v for k, v in food_type_codes.items()}
+    # # food_type_codes = mappings["food_type_codes"]
+    # # food_type_codes = {int(k): v for k, v in food_type_codes.items()}
 
-    timeslot_codes = mappings["timeslot_codes"]
-    timeslot_codes = {int(k): v for k, v in timeslot_codes.items()}
+    # timeslot_codes = mappings["timeslot_codes"]
+    # timeslot_codes = {int(k): v for k, v in timeslot_codes.items()}
 
-    store_codes = mappings["store_codes"]
-    store_codes = {int(k): v for k, v in store_codes.items()}
+    # store_codes = mappings["store_codes"]
+    # store_codes = {int(k): v for k, v in store_codes.items()}
 
     # dishes_list = mappings["dishes_list"]
-    timeslot_idx_obs = np.array(mappings["timeslot_idx_obs"], dtype=int)
-    store_idx_obs = np.array(mappings["store_idx_obs"], dtype=int)
-    dish_idx_obs = np.array(mappings["dish_idx_obs"], dtype=int)
+    # timeslot_idx_obs = np.array(mappings["timeslot_idx_obs"], dtype=int)
+    # store_idx_obs = np.array(mappings["store_idx_obs"], dtype=int)
+    # dish_idx_obs = np.array(mappings["dish_idx_obs"], dtype=int)
 
-    print("store_codes:", store_codes)
-    print("dish_codes:", dish_codes)
+    # print("store_codes:", store_codes)
+    # print("dish_codes:", dish_codes)
     # "timeslot_idx_obs": timeslot_idx_obs,
     #             "store_idx_obs": store_idx_obs,
     # Posterior  cho món có độ dài bằng sô món
@@ -494,9 +719,17 @@ def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.9
     # allocation = pax * mu_item_filtered
 
     # Build result
-    result = {}
+    # result = {
+    #     "date": date,
+    #     "timeslot": timeslot_id,
+    # }
+    forecasted_dish_list = {}
 
     for dish_id, dish_index in dish_codes.items():
+        # item = {
+        #     "date": date,
+        #     "timeslot": timeslot_id,
+        # }
         # idx = dish_codes[item_id]
         # item_info = {"forecast": int(allocation[i]), "mu": float(mu_item_filtered[i])}
         # Lấy mu cho từng dish, timeslot, store
@@ -509,7 +742,10 @@ def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.9
         )
         # Số suất dự báo = pax * mu_hat
         forecast = int(round(pax * mu_hat))
-        item_info = {"forecast": forecast, "mu": mu_hat}
+        item_info = {
+            "forecast": forecast,
+            "mu": mu_hat,
+        }
 
         # Thêm HDI cho từng mức
         for p, hdi in hdi_results.items():
@@ -532,7 +768,7 @@ def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.9
             )
             item_info[f"hdi{int(p * 100)}"] = (low, high)
 
-        result[dish_id] = item_info
+        forecasted_dish_list[dish_id] = item_info
 
         # # Add HDI
         # for p, hdi in hdi_results.items():
@@ -549,7 +785,8 @@ def forecast_dishes(idata_trace, pax, store_id, timeslot_id, hdi_probs=[0.8, 0.9
         #     item_info[f"hdi{int(p * 100)}"] = (low, high)
 
         # result[item_id] = item_info
-    return result
+    # result["forecasted_dish_list"] = forecasted_dish_list
+    return forecasted_dish_list
 
 
 def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
@@ -562,7 +799,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     df_ingredient_master = df_ingredient_master.rename(
         columns={"id": "ingredient_id", "name": "ingredient_name"}
     )
-    print(df_ingredient_master)
+    # print(df_ingredient_master)
     # Lấy BOM
     res_bom = supabase.from_("cip_bom").select("*").execute()
     # kiểm tra có dữ liệu không
@@ -595,7 +832,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     df_log = df_log[
         ["date", "store_id", "timeslot_id", "dish_id", "pax", "consumed_amount_suat"]
     ]
-    print(df_food_distribute.columns, "colums")
+    # print(df_food_distribute.columns, "colums")
     df_food_distribute = df_food_distribute[
         ["date", "store_id", "timeslot_id", "dish_id", "pax", "consumed_amount_suat"]
     ]
@@ -618,7 +855,9 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     # final_df = final_df.rename(
     #     columns={"dish_id": "Dish_Order", "Item_Name": "Dish_Name"}
     # )
-    df_demand = df_demand[["date", "dish_id", "ingredient_id", "ingredient_usage"]]
+    df_demand = df_demand[
+        ["date", "timeslot_id", "dish_id", "ingredient_id", "ingredient_usage"]
+    ]
     # Giữ thứ tự món ăn theo ngày demand = df_merge = history_demand
     df_demand = df_demand.sort_values(["date", "dish_id"]).reset_index(drop=True)
 
@@ -702,7 +941,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     ### df_demand = history =
     # df_demand["date"] = pd.to_datetime(df_demand["Date"]).dt.date
     # === 2) Tính tổng nhu cầu (Qty_Issued) theo ngày + nguyên liệu ===
-    daily_usage = daily_usage.rename(columns={"ingredient_usage": "qty_issued"})
+    daily_usage = daily_usage.rename(columns={"ingredient_usage": "qty_is_used"})
     # print(daily_usage["qty_issued"].head(), "daily_usage")
     # === 3) Lấy thông tin chính sách đặt hàng từ bảng master ===
     cols_needed = [
@@ -711,6 +950,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
         "ROP",
         "lead_time",
         "ingredient_name",
+        "category",
     ]
     # print(df_ingredient_master.columns, "iiiii")
     df_master_small = df_ingredient_master[cols_needed].copy()
@@ -726,12 +966,13 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     records = []
     for ing_id, row in df_master_small.set_index("ingredient_id").iterrows():
         # print(ing_id,"row")
-        OUL = float(row["order_up_to_level"])
-        ROP = float(row["ROP"])
+        OUL = round(float(row["order_up_to_level"]), 0)
+        ROP = round(float(row["ROP"]), 0)
         ingredient_name = row["ingredient_name"]
+        category = row["category"]
         lead = int(row["lead_time"]) if not pd.isna(row["lead_time"]) else 0
         # Bản đồ nhu cầu theo ngày
-        issued_map = daily_usage[daily_usage["ingredient_id"] == ing_id].set_index(
+        is_used_map = daily_usage[daily_usage["ingredient_id"] == ing_id].set_index(
             "date"
         )
         on_hand = None
@@ -740,7 +981,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
 
         for d in all_dates:
             # Nhận hàng nếu đến ngày
-            qty_received = pipeline.pop(d, 0.0)
+            qty_received = round(pipeline.pop(d, 0.0), 0)
             on_order_qty -= qty_received
 
             # Ngày đầu tiên: tồn = OUL
@@ -749,11 +990,13 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
 
             # Xuất kho theo nhu cầu
             try:
-                qty_issued = float(issued_map.loc[pd.Timestamp(d), "qty_issued"])
+                qty_is_used = round(
+                    float(is_used_map.loc[pd.Timestamp(d), "qty_is_used"]), 0
+                )
             except KeyError:
-                qty_issued = 0.0
+                qty_is_used = 0.0
                 # print(qty_issued, "qty_issued qty_issued")
-            ending_before = on_hand + qty_received - qty_issued
+            ending_before = round((on_hand + qty_received - qty_is_used), 0)
 
             # Kiểm tra reorder
             order_qty = 0.0
@@ -763,7 +1006,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
             # print(ROP, "daily_usage12 r")
             if ending_before < ROP:
                 inv_pos = ending_before + on_order_qty
-                order_qty = max(OUL - inv_pos, 0.0)
+                order_qty = round(max(OUL - inv_pos, 0.0), 0)
                 if order_qty > 0:
                     order_placed = True
                     exp_rcv_date = (pd.to_datetime(d) + pd.Timedelta(days=lead)).date()
@@ -776,11 +1019,13 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
             records.append(
                 {
                     "date": d,
+                    "timslot_id": timeslot_id,
                     "ingredient_id": ing_id,
                     "ingredient_name": ingredient_name,
+                    "category": category,
                     "qty_on_hand": on_hand,
                     "qty_received": qty_received,
-                    "qty_issued": qty_issued,
+                    "qty_is_used": qty_is_used,
                     "ending_inventory": ending_inv,
                     "ROP": ROP,
                     "order_up_to_level": OUL,
@@ -799,7 +1044,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     inv_daily["date"] = pd.to_datetime(inv_daily["date"], format="%Y-%m-%d")
     # Lọc các dòng date >= hôm nay
     today = pd.Timestamp(date.today())
-    inv_daily = inv_daily[inv_daily["date"] >= today]
+    inv_daily = inv_daily[inv_daily["date"] > today]
 
     expected_ids_sorted = sorted(
         df_ingredient_master["ingredient_id"].dropna().astype(str).unique(),
@@ -820,7 +1065,7 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
     # )
     inv_sorted = (
         inv_daily.sort_values(["date", "ingredient_id_cat"])
-        .loc[lambda df: df["qty_issued"] != 0]  # bỏ dòng có qty_issued = 0
+        .loc[lambda df: ~((df["qty_is_used"] == 0) & (df["qty_received"] == 0))]
         .drop(columns=["ingredient_id_cat"])
         .reset_index(drop=True)
     )
@@ -890,10 +1135,10 @@ def forecast_ingredient(supabase, store_id, timeslot_id, food_distribute):
 #         if item_date >= today:
 #             filtered.append(item)
 #     return filtered
-def filter_list_by_today(lst, today):
+def filter_list_by_today(list, today):
     return [
         item
-        for item in lst
+        for item in list
         if (
             (
                 datetime.fromisoformat(item["date"]).date()
@@ -903,6 +1148,44 @@ def filter_list_by_today(lst, today):
             > today
         )
     ]
+
+
+def filter_customers(customers_list):
+    today = date.today()
+    agg = defaultdict(dict)
+    for row in customers_list:
+        item_date = (
+            datetime.fromisoformat(row["date"]).date()
+            if isinstance(row["date"], str)
+            else row["date"].date()
+        )
+        if item_date > today:  # chỉ lấy ngày lớn hơn hôm nay
+            agg[row["date"]][row["timeslot_id"]] = row.get("total_customers", 0)
+
+    # Chuyển thành list of dict
+    result = []
+    for day, timeslots in agg.items():
+        entry = {"date": day}
+        entry.update(timeslots)  # merge dict timeslots vào level 1
+        result.append(entry)
+    return result
+
+
+def group_ingredients_by_date(ingredients_list):
+    # today = date.today()
+    grouped_ingredients_by_date = defaultdict(list)
+    for row in ingredients_list:
+        item_date = (
+            datetime.fromisoformat(row["date"]).date()
+            if isinstance(row["date"], str)
+            else row["date"].date()
+        )
+        grouped_ingredients_by_date[item_date].append(row)
+    result = [
+        {"date": date, "ingredients": ings}
+        for date, ings in grouped_ingredients_by_date.items()
+    ]
+    return result
 
 
 def group_items_by_date(

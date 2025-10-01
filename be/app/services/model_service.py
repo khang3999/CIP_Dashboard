@@ -222,7 +222,11 @@ class ModelService:
         # Sorted theo giá trị thật
         # timeslots_sorted = sorted(df_train["timeslot_id"].unique().tolist())
         timeslots_sorted_res = (
-            self.supabase.table("cip_timeslot").select("id").order("id").execute()
+            self.supabase.table("cip_timeslot")
+            .select("id")
+            .neq("id", 4)
+            .order("id")
+            .execute()
         )
 
         if not timeslots_sorted_res.data or len(timeslots_sorted_res.data) == 0:

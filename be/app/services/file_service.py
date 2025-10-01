@@ -166,10 +166,10 @@ async def process_flights_file(supabase, df: pd.DataFrame, sheet_name: str):
 
         # Xóa cột flights
         df = df.drop(columns=["flights"])
-        duplicates = df[df.duplicated(keep=False)]
-        print("Duplicate rows (all columns):")
-        print(duplicates)
-        print(df)
+        # duplicates = df[df.duplicated(keep=False)]
+        # print("Duplicate rows (all columns):")
+        # print(duplicates)
+        # print(df)
         records = df.to_dict(orient="records")
         if records:
             await supabase.table("cip_flights").upsert(records).execute()

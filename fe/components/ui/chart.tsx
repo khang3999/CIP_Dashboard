@@ -69,6 +69,24 @@ function ChartContainer({
   )
 }
 
+export const CHART_CONFIG = {
+  1: {
+    label: "Ca 0h -8h",
+    color: "hsl(var(--chart-1))",
+
+  },
+  2: {
+    label: "Ca 8h - 16h",
+    color: "hsl(var(--chart-1))",
+
+  },
+  3: {
+    label: "Ca 16h - 24h",
+    color: "hsl(var(--chart-1))",
+
+  },
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([, config]) => config.theme || config.color
@@ -118,6 +136,7 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
+  chartType
 }: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
   React.ComponentProps<"div"> & {
     hideLabel?: boolean
@@ -125,6 +144,7 @@ function ChartTooltipContent({
     indicator?: "line" | "dot" | "dashed"
     nameKey?: string
     labelKey?: string
+    chartType?: "customer" | "food" | "ingredient"
   }) {
   const { config } = useChart()
 
@@ -243,6 +263,18 @@ function ChartTooltipContent({
             </div>
           )
         })}
+
+        {/* Thêm tổng khi chartType là food */}
+        {(chartType === "food" || "customer") && payload.length > 0 && (
+          <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-border/50">
+            <span>Tổng:</span>
+            <span>
+              {payload
+                .reduce((sum, item) => sum + (Number(item.value) || 0), 0)
+                .toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

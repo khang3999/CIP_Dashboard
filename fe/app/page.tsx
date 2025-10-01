@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 // import { ThemeProvider } from "@/contexts/theme-provider"
@@ -10,6 +10,7 @@ import {
   PassengerShiftChart,
   FoodDistributionChart,
   IngredientDistributionChart,
+  COLORS,
 } from "@/components/simple-charts"
 import { PredictionControls } from "@/components/prediction-controls"
 import { ModelList } from "@/components/model-list"
@@ -20,8 +21,9 @@ import PredictionProvider, { usePredictionProvider } from "@/contexts/prediction
 import { formatDate, generateTicks, getDateRangeOfFuture } from "@/utils/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, LineChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, CartesianGrid, Tooltip, Line, Label, LabelList } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { CHART_CONFIG, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import DailyChart from "@/components/daily-chart"
+
 
 
 function OverviewSection() {
@@ -52,8 +54,12 @@ function PredictionsSection() {
   const [resultCustomers, setResultCustomers] = useState<any[] | null>(null)
   const [resultFoods, setResultFoods] = useState<any[] | null>(null)
   const [resultIngredients, setResultIngredients] = useState<any[] | null>(null)
+  const [dateList, setDateList] = useState<any[] | null>(null)
+  // const preParams = useRef(null)
+
 
   const handlePredict = async (predictionParams: PredictionParams | null) => {
+    // if (preParams == predictionParams) return
     if (!predictionParams) {
       console.log("Params is null");
       return
@@ -87,11 +93,22 @@ function PredictionsSection() {
         end_date: endDate ? endDate : null,
       }),
     });
-    const { data } = await res.json()
+    const { data, status } = await res.json()
+    if (status !== "Success") {
+      console.log("Fetch forecasted data failed! ");
+      setIsLoading(true)
+      return
+    }
     console.log(startDate);
-    console.log(data);
-    setResultCustomers(data.result_customers)
-    setResultFoods(data.result_foods)
+    console.log(data, 'data check');
+    if (data.result_customers?.length > 0) {
+      setResultCustomers(data.result_customers)
+      setDateList(data.result_customers.map((item: any) => item.date.split("T")[0]))
+    }
+    if (data.result_foods?.length > 0) {
+      setResultFoods(data.result_foods)
+      // setDateList(data.result_customers.map((item: any) => item.date))
+    }
     setResultIngredients(data.result_ingredients)
     setIsLoading(false)
   }
@@ -103,10 +120,10 @@ function PredictionsSection() {
     setResultIngredients(null)
   }, [predictionParams])
 
-  useEffect(() => {
-    if (!resultFoods) return
-    // Xử lí gom nhóm món ăn theo ngày
-  }, [resultFoods])
+  // useEffect(() => {
+  //   if (!resultFoods) return
+  //   // Xử lí gom nhóm món ăn theo ngày
+  // }, [resultFoods])
 
   return (
     // <PredictionProvider>
@@ -126,19 +143,16 @@ function PredictionsSection() {
 
                 <CardContent>
                   <ChartContainer
-                    config={{
-                      total_customers: {
-                        label: "Số khách",
-                        color: "hsl(var(--chart-1))",
-
-                      },
-                    }}
+                    config={CHART_CONFIG}
                     className="h-[450px] px-5 z-10"
                   >
                     {/* <div className='h-full'> */}
                     <ResponsiveContainer width="100%" height="100%" className={"select-none"}>
-                      {resultCustomers?.length != 0 ?
-                        <LineChart data={resultCustomers!} margin={{ top: 15, bottom: 15 }}>
+                      {resultCustomers?.length > 0 ?
+                        <LineChart
+
+                          data={resultCustomers}
+                          margin={{ top: 15, bottom: 15 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -166,10 +180,45 @@ function PredictionsSection() {
                             <Label value="Số khách" angle={0} position="insideTopLeft" dy={-20} />
                           </YAxis>
                           {/* <Tooltip content={<CustomTooltip />}></Tooltip> */}
-                          <ChartTooltip content={<ChartTooltipContent />} />
-                          <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} >
-                            <LabelList dataKey="total_customers" position="top" />
-                          </Line>
+
+
+                          {/* {resultCustomers.map((dataCustomer, idx) => (
+                            <> */}
+                          {/* Tự động tạo Line theo số ca */}
+                          {Object.keys(resultCustomers[0])
+                            .filter((key) => key !== "date") // bỏ trường date
+                            .map((timeslotId, idx) => (
+                              <Line
+                                key={timeslotId}
+                                type="monotone"
+                                dataKey={timeslotId}
+                                stroke={COLORS[idx % COLORS.length]}
+                                strokeWidth={2}
+                                dot={false}
+                              >
+                                <LabelList dataKey={timeslotId} position="top" />
+                              </Line>
+
+                            ))}
+                          {/* <Line
+                                key={caKey}
+                                type="monotone"
+                                dataKey={caKey}
+                                stroke={COLORS[idx % COLORS.length]}
+                                strokeWidth={2}
+                                dot={false}
+                              /> */}
+                          <ChartTooltip
+                            content={<ChartTooltipContent />}
+                            labelFormatter={(value) => {
+                              // value chính là payload[0].payload.date
+                              return value.split("T")[0]
+                            }} />
+                          {/* </> */}
+                          {/* ))} */}
+                          {/* <Line type="monotone" dataKey="total_customers" stroke="#8884d8" strokeWidth={2} dot={false} >
+                          <LabelList dataKey="total_customers" position="top" />
+                          </Line> */}
                         </LineChart>
                         :
                         <CardDescription className="text-center text-3xl">Không có dữ liệu</CardDescription>
@@ -190,9 +239,10 @@ function PredictionsSection() {
           )}
         </div>
 
-        {resultFoods && resultIngredients ?
+        {/* {resultFoods && resultIngredients ? */}
+        {resultFoods ?
           <div className="col-span-3 lg:col-span-3">
-            <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} />
+            <DailyChart foodsData={resultFoods} ingredientsData={resultIngredients} dateList={dateList} timeslot={selectedTimeslot} />
           </div> :
           <></>
         }
