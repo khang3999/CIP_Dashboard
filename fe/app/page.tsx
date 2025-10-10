@@ -209,7 +209,7 @@ function PredictionsSection() {
                                 dot={false}
                               /> */}
                           <ChartTooltip
-                            content={<ChartTooltipContent />}
+                            content={<ChartTooltipContent chartType="customer"/>}
                             labelFormatter={(value) => {
                               // value chính là payload[0].payload.date
                               return value.split("T")[0]

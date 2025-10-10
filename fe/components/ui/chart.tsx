@@ -265,7 +265,7 @@ function ChartTooltipContent({
         })}
 
         {/* Thêm tổng khi chartType là food */}
-        {(chartType === "food" || "customer") && payload.length > 0 && (
+        {(chartType === "food" || chartType === "customer") && payload.length > 0 && (
           <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-border/50">
             <span>Tổng:</span>
             <span>

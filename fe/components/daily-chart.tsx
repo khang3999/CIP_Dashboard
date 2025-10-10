@@ -366,6 +366,8 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                         >
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart >
+                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                    <ChartLegend content={<ChartLegendContent />} className='lg:grid-cols-5' />
                                     {totalTimeslots?.map((timeslot, index) => (
                                         <Pie
                                             key={timeslot.id}
@@ -413,8 +415,7 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                                             ))}
                                         </Pie>
                                     ))}
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <ChartLegend content={<ChartLegendContent />} className='lg:grid-cols-5' />
+
                                 </PieChart>
                             </ResponsiveContainer>
                         </ChartContainer>
@@ -442,7 +443,7 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                             >
                                 <div className='w-[2000px] h-[100%]'>
                                     <ResponsiveContainer width="100%" height="100%" className="select-none ">
-                                        <ComposedChart
+                                        <BarChart
                                             data={currentIngredients || []}
                                             // layout="vertical"
                                             margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
@@ -478,11 +479,11 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                                             // }}
                                             />
                                             <ChartTooltip content={<ChartTooltipContent />} />
-                                            <Bar dataKey="qty_is_used" fill="#ff7300" name="Sử dụng" stackId="a" >
+                                            <Bar dataKey="qty_is_used" fill="#ff7300" name="Sử dụng">
                                                 {/* <LabelList dataKey="qty_is_used" position="top" /> */}
                                             </Bar>
                                             {/* <Bar dataKey="qty_received" fill="#8884d8" name="Nhận mới" stackId="a" /> */}
-                                        </ComposedChart>
+                                        </BarChart>
                                     </ResponsiveContainer>
                                 </div>
 
@@ -524,21 +525,23 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                         {/* <CardHeader>
                             <CardTitle>Số lượng sử dụng và tồn kho theo nhóm nguyên liệu</CardTitle>
                         </CardHeader> */}
-                        <CardContent>
+                        <CardContent className='h-[3000px]'>
                             <CardTitle> Nguyên liệu cần sử dụng và tồn kho theo nhóm</CardTitle>
                             <div className='gap-5 w-full py-3'>
                                 <div className='rounded-2xl bg-red-200 p-3'>
                                     <ChartContainer
-                                        config={{}}
-                                        className=" w-full px-5 z-10"
+                                        config={CHART_CONFIG}
+                                        className=" w-full px-5"
                                     >
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" className="select-none">
                                             <BarChart
                                                 data={ingredientsByCategory}
                                                 margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                                                 // barCategoryGap="20%"
-                                                barSize={20}
+                                                barSize={25}
                                             >
+                                                <CartesianGrid strokeDasharray="3 3" />
+
                                                 <XAxis
                                                     type="category"
                                                     dataKey="category"
@@ -546,17 +549,17 @@ function DailyChart({ foodsData, ingredientsData, dateList, timeslot }: DailyCha
                                                 <YAxis
                                                     // dataKey="dishName"
                                                     type="number"
-                                                    interval={0}
+                                                    // interval={0}
                                                     width={150}
                                                     padding={{ bottom: 10 }}
                                                     tick={{
                                                         fontWeight: "600",
                                                     }}
                                                 />
-                                                <Bar dataKey="totalOnHand" fill="#ff7300" name="Tồn kho"></Bar>
-                                                <Bar dataKey="totalIsUsed" fill="#8884d8" name="Sử dụng"></Bar>
-                                                <ChartTooltip content={<ChartTooltipContent />} />
+                                                <ChartTooltip content={<ChartTooltipContent chartType='ingredient' />} />
                                                 <ChartLegend content={<ChartLegendContent />} className='lg:grid-cols-1 justify-center flex gap-10' />
+                                                <Bar key="totalOnHand" dataKey="totalOnHand" fill="#ff7300" name="Tồn kho" ></Bar>
+                                                <Bar key="totalIsUsed" dataKey="totalIsUsed" fill="#8884d8" name="Sử dụng" ></Bar>
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </ChartContainer>

@@ -635,7 +635,7 @@ def objective(trial, X_train_80, y_train_80):
         "eval_metric": "rmse",  # Đưa trực tiếp vào model
         "early_stopping_rounds": 50,  # Đưa trực tiếp vào model
     }
-    # Cross-validation theo thời gian
+    # Cross-validation theo thời gian                               ``
     tscv = TimeSeriesSplit(n_splits=3)
     rmses = []
 
