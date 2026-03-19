@@ -50,5 +50,5 @@ The system analyzes operational data to predict lounge usage and forecast menu d
 ---
 
 ## 📸 Demo
-
+![CIP Dashboard](https://drive.google.com/file/d/1E50PGcuCP8mFZD8YZ4wDijlWuVOkYTW5/view?usp=drive_link)
 ---
