@@ -19,13 +19,12 @@ The system analyzes operational data to predict lounge usage and forecast menu d
 ## 🛠️ Tech Stack
 
 ### Frontend
-- ReactJS / NextJS
-- CSS / TailwindCSS
-- Chart.js / Recharts
+- NextJS
+- TailwindCSS
+- Chart.js
 
 ### Backend
 - FastAPI
-- RESTful APIs
 
 ### AI / Data Processing
 - Python
